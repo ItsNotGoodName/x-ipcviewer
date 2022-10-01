@@ -23,8 +23,14 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
+	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
+	vlc "github.com/adrg/libvlc-go/v3"
+	"github.com/jezek/xgb"
+	"github.com/jezek/xgb/xproto"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -43,7 +49,43 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Run: func(cmd *cobra.Command, args []string) {
+		x, err := xgb.NewConn()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer x.Close()
+
+		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), mosaic.NewMosaic(mosaic.Layout2x2{}))
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		for i := 0; i < len(args); i++ {
+			window, err := manager.AddWindow(x)
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			if err := window.AccessPlayer(func(player *vlc.Player) error {
+				if _, err := player.LoadMediaFromURL(args[i]); err != nil {
+					return err
+				}
+
+				if i == 0 {
+					if err := player.SetMute(false); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			}); err != nil {
+				log.Fatalln(err)
+			}
+		}
+
+		xwm.HandleEvents(x, manager)
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
