@@ -26,6 +26,8 @@ func NewWindow(wid xproto.Window) (xwm.Window, error) {
 	cmd := exec.Command(
 		"mpv",
 		fmt.Sprintf("--wid=%d", wid),
+		"--vo=gpu",
+		"--hwdec=auto",
 		"--profile=low-latency",
 		"--no-cache",
 		"--input-vo-keyboard=no",
