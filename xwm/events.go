@@ -53,7 +53,7 @@ func HandleEvents(x *xgb.Conn, m *Manager) {
 				return // exit on q
 			}
 
-			m.KeyPress(ev)
+			m.KeyPress(x, ev)
 		case xproto.DestroyNotifyEvent:
 			// Depending on the user's desktop environment (especially
 			// window manager), killing a window might close the

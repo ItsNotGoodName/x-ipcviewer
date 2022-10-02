@@ -159,7 +159,18 @@ func (m *Manager) UpdateRoot(x *xgb.Conn, width, height uint16) {
 	m.lastWidth, m.lastHeight = width, height
 }
 
-func (m *Manager) KeyPress(ev xproto.KeyPressEvent) {
+func (m *Manager) KeyPress(x *xgb.Conn, ev xproto.KeyPressEvent) {
+	// Numbers 1 - 9
+	if ev.Detail >= 10 && ev.Detail <= 18 {
+		cLen := len(m.containers)
+		idx := int(ev.Detail - 10)
+		if idx < cLen {
+			m.ToggleFullscreen(x, idx)
+		}
+
+		return
+	}
+
 	for _, container := range m.containers {
 		if container.WID == ev.Child {
 			container.Window.KeyPress(ev)
