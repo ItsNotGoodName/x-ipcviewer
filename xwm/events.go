@@ -39,6 +39,10 @@ func HandleEvents(x *xgb.Conn, m *Manager) {
 			if m.RootChanged(ev.Width, ev.Height) {
 				m.UpdateRoot(x, ev.Width, ev.Height)
 			}
+		case xproto.ButtonPressEvent:
+			fmt.Printf("Button pressed: %d\n", ev.Detail)
+
+			m.ButtonPress(x, ev)
 		case xproto.KeyPressEvent:
 			// See https://pkg.go.dev/github.com/jezek/xgb/xproto#KeyPressEvent
 			// for documentation about a key press event.
@@ -49,7 +53,7 @@ func HandleEvents(x *xgb.Conn, m *Manager) {
 				return // exit on q
 			}
 
-			m.HandleKeyPressEvent(ev)
+			m.KeyPress(ev)
 		case xproto.DestroyNotifyEvent:
 			// Depending on the user's desktop environment (especially
 			// window manager), killing a window might close the

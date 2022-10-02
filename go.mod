@@ -3,7 +3,7 @@ module github.com/ItsNotGoodName/x-ipc-viewer
 go 1.19
 
 require (
-	github.com/adrg/libvlc-go/v3 v3.1.5
+	github.com/DexterLB/mpvipc v0.0.0-20210824102722-5d27ef06b6c3
 	github.com/jezek/xgb v1.0.1
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.13.0
@@ -25,6 +25,7 @@ require (
 	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

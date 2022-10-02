@@ -25,10 +25,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
+	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
-	vlc "github.com/adrg/libvlc-go/v3"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
 	"github.com/spf13/cobra"
@@ -60,26 +61,18 @@ to quickly create a Cobra application.`,
 		if err != nil {
 			log.Fatalln(err)
 		}
+		defer manager.Release()
+
+		c := make(chan os.Signal, 2)
+		signal.Notify(c, os.Interrupt, os.Kill)
+		go func() {
+			<-c
+			manager.Release()
+			os.Exit(1)
+		}()
 
 		for i := 0; i < len(args); i++ {
-			window, err := manager.AddWindow(x)
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			if err := window.AccessPlayer(func(player *vlc.Player) error {
-				if _, err := player.LoadMediaFromURL(args[i]); err != nil {
-					return err
-				}
-
-				if i == 0 {
-					if err := player.SetMute(false); err != nil {
-						return err
-					}
-				}
-
-				return nil
-			}); err != nil {
+			if err := manager.AddContainer(x, mpv.NewWindow, xwm.ContainerConfig{MainStream: args[i]}); err != nil {
 				log.Fatalln(err)
 			}
 		}
