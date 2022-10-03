@@ -99,7 +99,7 @@ func (m *Manager) AddContainer(x *xgb.Conn, windowFactory WindowFactory, config 
 	return err
 }
 
-func (m *Manager) RootChanged(width, height uint16) bool {
+func (m *Manager) ShouldUpdateRoot(width, height uint16) bool {
 	return width != m.lastWidth || height != m.lastHeight
 }
 
@@ -178,10 +178,10 @@ func (m *Manager) KeyPress(x *xgb.Conn, ev xproto.KeyPressEvent) {
 	}
 }
 
-func (m *Manager) ButtonPress(x *xgb.Conn, ev xproto.ButtonPressEvent) {
+func (m *Manager) ButtonPress(x *xgb.Conn, ev xproto.ButtonPressEvent, double bool) {
 	for i, container := range m.containers {
 		if container.WID == ev.Child {
-			if ev.Detail == 1 {
+			if ev.Detail == 1 && double {
 				m.ToggleFullscreen(x, i)
 			} else {
 				container.Window.ButtonPress(ev)

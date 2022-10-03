@@ -77,7 +77,7 @@ to quickly create a Cobra application.`,
 			}
 		}
 
-		xwm.HandleEvents(x, manager)
+		xwm.HandleEvent(x, manager)
 	},
 }
 
