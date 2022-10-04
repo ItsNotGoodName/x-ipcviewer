@@ -58,12 +58,23 @@ to quickly create a Cobra application.`,
 		}
 		defer x.Close()
 
-		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), mosaic.NewMosaic(mosaic.Layout2x2{}))
+		// Create appropritate size grid
+		argsLen := len(args)
+		xc, yc := 0, 0
+		for xc*yc < argsLen {
+			xc++
+			if xc*yc >= argsLen {
+				break
+			}
+			yc++
+		}
+
+		// Manager
+		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), mosaic.NewMosaic(mosaic.NewLayoutGrid(xc, yc)))
 		if err != nil {
 			log.Fatalln(err)
 		}
 		defer manager.Release()
-
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
 		go func() {
@@ -72,6 +83,7 @@ to quickly create a Cobra application.`,
 			os.Exit(1)
 		}()
 
+		// Windows
 		for i := 0; i < len(args); i++ {
 			streams := strings.Split(args[i], ",")
 			streamsLen := len(streams)

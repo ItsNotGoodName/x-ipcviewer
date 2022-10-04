@@ -34,7 +34,3 @@ func (m *Mosaic) Windows(w, h uint16) []Window {
 	m.layout.Update(m.windows, w, h)
 	return m.windows
 }
-
-func (m *Mosaic) LastWindows() []Window {
-	return m.windows
-}
