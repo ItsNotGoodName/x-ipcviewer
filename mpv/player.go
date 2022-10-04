@@ -3,25 +3,34 @@ package mpv
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"sync/atomic"
 	"time"
 
-	"github.com/DexterLB/mpvipc"
+	"github.com/ItsNotGoodName/mpvipc"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
 	"github.com/jezek/xgb/xproto"
 )
 
-var rpcID int32 = 0
+const (
+	event_demuxer_cache_idle uint = iota + 1
+	event_demuxer_cache_time
+)
+
+var rpcId int32 = 0
 
 type Player struct {
-	cmd  *exec.Cmd
-	conn *mpvipc.Connection
+	cmd        *exec.Cmd
+	conn       *mpvipc.Connection
+	streamC    chan string
+	socketPath string
 }
 
 func NewPlayer(wid xproto.Window) (xwm.Player, error) {
-	socketPath := fmt.Sprintf("/tmp/mpv_socket_%d", atomic.AddInt32(&rpcID, 1))
+	socketPath := fmt.Sprintf("/tmp/x-ipc-viewer-mpv-socket-%d", atomic.AddInt32(&rpcId, 1))
 
+	// Start mpv
 	cmd := exec.Command(
 		"mpv",
 		fmt.Sprintf("--wid=%d", wid),
@@ -34,34 +43,46 @@ func NewPlayer(wid xproto.Window) (xwm.Player, error) {
 		"--no-osc",
 		"--force-window",
 		"--idle",
-		"--input-unix-socket="+socketPath,
+		"--loop-file=inf",
+		fmt.Sprintf("--input-unix-socket=%s", socketPath),
 	)
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
 
+	// Open connection
 	var conn *mpvipc.Connection
+	eventC := make(chan *mpvipc.Event, 50)
 	for {
 		conn = mpvipc.NewConnection(socketPath)
-		if err := conn.Open(); err != nil {
+		if err := conn.Open(eventC); err == nil {
 			fmt.Println("connected to " + socketPath)
 			break
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
-	for {
-		if err := conn.Open(); err == nil {
-			break
-		}
 
-		time.Sleep(100 * time.Millisecond)
+	// Setup event observers
+	_, err := conn.Call("observe_property", event_demuxer_cache_idle, "demuxer-cache-idle")
+	if err != nil {
+		return nil, err
+	}
+	_, err = conn.Call("observe_property", event_demuxer_cache_time, "demuxer-cache-time")
+	if err != nil {
+		return nil, err
 	}
 
-	return &Player{
-		cmd:  cmd,
-		conn: conn,
-	}, nil
+	p := Player{
+		cmd:        cmd,
+		conn:       conn,
+		streamC:    make(chan string),
+		socketPath: socketPath,
+	}
+
+	go watch(p, eventC)
+
+	return p, nil
 }
 
 func (p Player) Mute(mute bool) error {
@@ -76,21 +97,31 @@ func (p Player) Mute(mute bool) error {
 }
 
 func (p Player) Play(stream string) error {
+	p.streamC <- stream
 	_, err := p.conn.Call("loadfile", stream)
 	return err
 }
 
 func (p Player) Stop() error {
+	p.streamC <- ""
 	_, err := p.conn.Call("stop")
 	return err
 }
 
 func (p Player) Release() {
+	if p.conn.IsClosed() {
+		return
+	}
+
 	if err := p.conn.Close(); err != nil {
-		log.Println("mpv.Window.Release:", err)
+		log.Println("mpv.Player.Release:", err)
 	}
 
 	if err := p.cmd.Process.Kill(); err != nil {
-		log.Println("mpv.Window.Release:", err)
+		log.Println("mpv.Player.Release:", err)
+	}
+
+	if err := os.Remove(p.socketPath); err != nil {
+		log.Println("mpv.Player.Release:", err)
 	}
 }
