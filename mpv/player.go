@@ -14,13 +14,12 @@ import (
 
 var rpcID int32 = 0
 
-type Window struct {
-	wid  xproto.Window
+type Player struct {
 	cmd  *exec.Cmd
 	conn *mpvipc.Connection
 }
 
-func NewWindow(wid xproto.Window) (xwm.Window, error) {
+func NewPlayer(wid xproto.Window) (xwm.Player, error) {
 	socketPath := fmt.Sprintf("/tmp/mpv_socket_%d", atomic.AddInt32(&rpcID, 1))
 
 	cmd := exec.Command(
@@ -59,43 +58,39 @@ func NewWindow(wid xproto.Window) (xwm.Window, error) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return &Window{
-		wid:  wid,
+	return &Player{
 		cmd:  cmd,
 		conn: conn,
 	}, nil
 }
 
-func (w *Window) KeyPress(ev xproto.KeyPressEvent) {}
-
-func (w *Window) ButtonPress(ev xproto.ButtonPressEvent) {}
-
-func (w *Window) Mute(mute bool) error {
-	var value string
+func (p Player) Mute(mute bool) error {
+	var value int
 	if mute {
-		value = "yes"
+		value = 0
 	} else {
-		value = "no"
+		value = 100
 	}
-	return w.conn.Set("ao-mute", value)
+
+	return p.conn.Set("volume", value)
 }
 
-func (w *Window) Start(url string) error {
-	_, err := w.conn.Call("loadfile", url)
+func (p Player) Play(stream string) error {
+	_, err := p.conn.Call("loadfile", stream)
 	return err
 }
 
-func (w *Window) Stop() error {
-	_, err := w.conn.Call("stop")
+func (p Player) Stop() error {
+	_, err := p.conn.Call("stop")
 	return err
 }
 
-func (w *Window) Release() {
-	if err := w.conn.Close(); err != nil {
+func (p Player) Release() {
+	if err := p.conn.Close(); err != nil {
 		log.Println("mpv.Window.Release:", err)
 	}
 
-	if err := w.cmd.Process.Kill(); err != nil {
+	if err := p.cmd.Process.Kill(); err != nil {
 		log.Println("mpv.Window.Release:", err)
 	}
 }

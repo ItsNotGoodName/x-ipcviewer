@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
@@ -63,8 +64,8 @@ to quickly create a Cobra application.`,
 		}
 		defer manager.Release()
 
-		c := make(chan os.Signal, 2)
-		signal.Notify(c, os.Interrupt, os.Kill)
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
 		go func() {
 			<-c
 			manager.Release()
@@ -72,7 +73,16 @@ to quickly create a Cobra application.`,
 		}()
 
 		for i := 0; i < len(args); i++ {
-			if err := manager.AddContainer(x, mpv.NewWindow, xwm.ContainerConfig{MainStream: args[i]}); err != nil {
+			streams := strings.Split(args[i], ",")
+			streamsLen := len(streams)
+			if streamsLen == 0 {
+				continue
+			}
+			if streamsLen == 1 {
+				streams = append(streams, streams[0])
+			}
+
+			if err := manager.AddWindow(x, mpv.NewPlayer, xwm.WindowConfig{MainStream: streams[0], SubStream: streams[1], Background: true}); err != nil {
 				log.Fatalln(err)
 			}
 		}
