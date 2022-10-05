@@ -26,8 +26,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 
+	"github.com/ItsNotGoodName/x-ipc-viewer/config"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
@@ -38,6 +38,7 @@ import (
 )
 
 var cfgFile string
+var conf config.Config
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -58,19 +59,8 @@ to quickly create a Cobra application.`,
 		}
 		defer x.Close()
 
-		// Create appropritate size grid
-		argsLen := len(args)
-		xc, yc := 0, 0
-		for xc*yc < argsLen {
-			xc++
-			if xc*yc >= argsLen {
-				break
-			}
-			yc++
-		}
-
 		// Manager
-		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), mosaic.NewMosaic(mosaic.NewLayoutGrid(xc, yc)))
+		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), mosaic.NewMosaic(mosaic.NewLayoutGridCount(len(conf.Windows))))
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -84,17 +74,8 @@ to quickly create a Cobra application.`,
 		}()
 
 		// Windows
-		for i := 0; i < len(args); i++ {
-			streams := strings.Split(args[i], ",")
-			streamsLen := len(streams)
-			if streamsLen == 0 {
-				continue
-			}
-			if streamsLen == 1 {
-				streams = append(streams, streams[0])
-			}
-
-			if err := manager.AddWindow(x, mpv.NewPlayer, xwm.WindowConfig{MainStream: streams[0], SubStream: streams[1], Background: true}); err != nil {
+		for _, window := range conf.Windows {
+			if err := manager.AddWindow(x, mpv.NewPlayer, xwm.WindowConfig{MainStream: window.Main, SubStream: window.Sub, Background: conf.Background}); err != nil {
 				log.Fatalln(err)
 			}
 		}
@@ -147,5 +128,9 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+
+		if err = viper.Unmarshal(&conf); err != nil {
+			log.Fatalf("Unable to decode into struct, %v", err)
+		}
 	}
 }

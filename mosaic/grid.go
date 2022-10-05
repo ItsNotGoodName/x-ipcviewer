@@ -3,19 +3,30 @@ package mosaic
 type LayoutGrid struct {
 	xc int
 	yc int
-	c  int
 }
 
-func NewLayoutGrid(wc, hc int) LayoutGrid {
+func NewLayoutGridCount(count int) LayoutGrid {
+	xc, yc := 0, 0
+	for xc*yc < count {
+		xc++
+		if xc*yc >= count {
+			break
+		}
+		yc++
+	}
+
+	return NewLayoutGrid(xc, yc)
+}
+
+func NewLayoutGrid(xc, yc int) LayoutGrid {
 	return LayoutGrid{
-		xc: wc,
-		yc: hc,
-		c:  wc * hc,
+		xc: xc,
+		yc: yc,
 	}
 }
 
 func (l LayoutGrid) Count() int {
-	return l.c
+	return l.xc * l.yc
 }
 
 func (l LayoutGrid) Update(wins []Window, w, h uint16) {
