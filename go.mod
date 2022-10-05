@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/ItsNotGoodName/mpvipc v0.0.0-20221004104251-2fa703cd7795
+	github.com/google/uuid v1.3.0
 	github.com/jezek/xgb v1.0.1
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.13.0

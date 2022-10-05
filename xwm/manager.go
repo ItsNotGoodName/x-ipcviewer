@@ -23,20 +23,20 @@ type Manager struct {
 func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manager, error) {
 	width, height := screen.WidthInPixels, screen.HeightInPixels
 
-	// Generate window id
+	// Generate x window id
 	wid, err := xproto.NewWindowId(x)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create main window
+	// Create main x window
 	if err := xproto.CreateWindowChecked(x, screen.RootDepth, wid, screen.Root,
 		0, 0, width, height, 0,
 		xproto.WindowClassInputOutput, screen.RootVisual, 0, []uint32{}).Check(); err != nil {
 		return nil, err
 	}
 
-	// Set background to black and listen for resize, key presses, and key releases
+	// Set x window background to black and listen for resize, key presses, and button presses
 	xproto.ChangeWindowAttributesChecked(x, wid,
 		xproto.CwBackPixel|xproto.CwEventMask,
 		[]uint32{
@@ -46,8 +46,9 @@ func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manag
 				xproto.EventMaskButtonPress,
 		})
 
-	// Show window
+	// Show x window
 	if err = xproto.MapWindowChecked(x, wid).Check(); err != nil {
+		xproto.DestroyWindow(x, wid)
 		return nil, err
 	}
 
@@ -63,39 +64,47 @@ func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manag
 }
 
 func (m *Manager) AddWindow(x *xgb.Conn, factory PlayerFactory, config WindowConfig) error {
-	// Generate window id
+	// Generate x window id
 	wid, err := xproto.NewWindowId(x)
 	if err != nil {
 		return err
 	}
 
-	// Create window in root
+	// Create x window in root
 	if xproto.CreateWindow(x, m.screen.RootDepth, wid, m.WID,
 		0, 0, 1, 1, 0,
 		xproto.WindowClassInputOutput, m.screen.RootVisual, 0, []uint32{}).Check(); err != nil {
 		return err
 	}
 
+	// Show x window
+	if err = xproto.MapWindowChecked(x, wid).Check(); err != nil {
+		xproto.DestroyWindow(x, wid)
+		return err
+	}
+
 	// Create player
 	player, err := factory(wid)
 	if err != nil {
+		xproto.DestroyWindow(x, wid)
 		return err
 	}
 	player = NewPlayerCache(player)
 
 	// Create window
 	window := NewWindow(wid, player, config)
-	m.windows = append(m.windows, window)
-
-	m.Update(x)
 
 	// Show window
-	if err = xproto.MapWindowChecked(x, wid).Check(); err != nil {
-		return err
-	}
 	if err := window.Show(false, false); err != nil {
+		xproto.DestroyWindow(x, wid)
+		window.Release()
 		return err
 	}
+
+	m.windows = append(m.windows, window)
+
+	// Update
+	m.Update(x)
 
 	return err
 }

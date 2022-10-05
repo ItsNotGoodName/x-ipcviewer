@@ -5,11 +5,11 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"sync/atomic"
 	"time"
 
 	"github.com/ItsNotGoodName/mpvipc"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
+	"github.com/google/uuid"
 	"github.com/jezek/xgb/xproto"
 )
 
@@ -17,8 +17,6 @@ const (
 	event_demuxer_cache_idle uint = iota + 1
 	event_demuxer_cache_time
 )
-
-var rpcId int32 = 0
 
 type Player struct {
 	cmd        *exec.Cmd
@@ -28,7 +26,7 @@ type Player struct {
 }
 
 func NewPlayer(wid xproto.Window) (xwm.Player, error) {
-	socketPath := fmt.Sprintf("/tmp/x-ipc-viewer-mpv-socket-%d", atomic.AddInt32(&rpcId, 1))
+	socketPath := fmt.Sprintf("/tmp/x-ipc-viewer-mpv-%s", uuid.New())
 
 	// Start mpv
 	cmd := exec.Command(
@@ -97,14 +95,18 @@ func (p Player) Mute(mute bool) error {
 }
 
 func (p Player) Play(stream string) error {
-	p.streamC <- stream
 	_, err := p.conn.Call("loadfile", stream)
+	if err == nil {
+		p.streamC <- stream
+	}
 	return err
 }
 
 func (p Player) Stop() error {
-	p.streamC <- ""
 	_, err := p.conn.Call("stop")
+	if err == nil {
+		p.streamC <- ""
+	}
 	return err
 }
 

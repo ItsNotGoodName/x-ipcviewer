@@ -17,6 +17,10 @@ type Window struct {
 }
 
 func NewWindow(wid xproto.Window, player Player, config WindowConfig) Window {
+	if config.SubStream == "" {
+		config.SubStream = config.MainStream
+	}
+
 	return Window{
 		wid:        wid,
 		player:     player,
@@ -47,9 +51,9 @@ func (c Window) Hide() error {
 		}
 
 		return c.player.Mute(true)
-	} else {
-		return c.player.Stop()
 	}
+
+	return c.player.Stop()
 }
 
 func (c Window) Release() {

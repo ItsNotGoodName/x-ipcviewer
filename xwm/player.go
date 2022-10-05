@@ -16,6 +16,7 @@ type Player interface {
 
 type PlayerFactory func(wid xproto.Window) (Player, error)
 
+// PlayerCache prevents redundant calls to Player.
 type PlayerCache struct {
 	player Player
 	muted  bool
