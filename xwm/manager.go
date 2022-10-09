@@ -8,8 +8,9 @@ import (
 	"github.com/jezek/xgb/xproto"
 )
 
+// Manager is NOT concurrent safe.
 type Manager struct {
-	WID    xproto.Window
+	wid    xproto.Window
 	screen *xproto.ScreenInfo
 	mosaic mosaic.Mosaic
 
@@ -52,7 +53,7 @@ func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manag
 	}
 
 	return &Manager{
-		WID:           wid,
+		wid:           wid,
 		screen:        screen,
 		width:         width,
 		height:        height,
@@ -62,51 +63,14 @@ func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manag
 	}, nil
 }
 
-func (m *Manager) AddWindow(x *xgb.Conn, factory PlayerFactory, config WindowConfig) error {
-	// Generate x window id
-	wid, err := xproto.NewWindowId(x)
-	if err != nil {
-		return err
+func (m *Manager) AddWindows(x *xgb.Conn, windows []Window) {
+	m.windows = append(m.windows, windows...)
+
+	for i := range m.windows {
+		m.windows[i].Show(false, false)
 	}
 
-	// Create x window in root
-	if xproto.CreateWindowChecked(x, m.screen.RootDepth,
-		wid, m.WID,
-		0, 0, 1, 1, 0,
-		xproto.WindowClassInputOutput, xproto.WindowClassCopyFromParent, 0, []uint32{}).Check(); err != nil {
-		return err
-	}
-
-	// Show x window
-	if err = xproto.MapWindowChecked(x, wid).Check(); err != nil {
-		xproto.DestroyWindow(x, wid)
-		return err
-	}
-
-	// Create player
-	player, err := factory(wid)
-	if err != nil {
-		xproto.DestroyWindow(x, wid)
-		return err
-	}
-	player = NewPlayerCache(player)
-
-	// Create window
-	window := NewWindow(wid, player, config)
-
-	// Show window
-	if err := window.Show(false, false); err != nil {
-		xproto.DestroyWindow(x, wid)
-		window.Release()
-		return err
-	}
-
-	m.windows = append(m.windows, window)
-
-	// Update
 	m.Update(x)
-
-	return err
 }
 
 func (m *Manager) ToggleFullscreen(x *xgb.Conn, wid xproto.Window) {
@@ -115,9 +79,7 @@ func (m *Manager) ToggleFullscreen(x *xgb.Conn, wid xproto.Window) {
 		m.fullscreenWid = 0
 
 		for _, window := range m.windows {
-			if err := window.Show(false, false); err != nil {
-				log.Printf("xwm.Manager.ToggleFullscreen: window %d: show: %s\n", window.wid, err)
-			}
+			window.Show(false, false)
 		}
 	} else {
 		// Fullscreen
@@ -129,13 +91,9 @@ func (m *Manager) ToggleFullscreen(x *xgb.Conn, wid xproto.Window) {
 				if err := xproto.ConfigureWindowChecked(x, window.wid, xproto.ConfigWindowStackMode, []uint32{0}).Check(); err != nil {
 					log.Printf("xwm.Manager.ToggleFullscreen: window %d: stack: %s\n", window.wid, err)
 				}
-				if err := window.Show(true, true); err != nil {
-					log.Printf("xwm.Manager.ToggleFullscreen: window %d: show: %s\n", window.wid, err)
-				}
+				window.Show(true, true)
 			} else {
-				if err := window.Hide(); err != nil {
-					log.Printf("xwm.Manager.ToggleFullscreen: window %d: hide: %s\n", window.wid, err)
-				}
+				window.Hide()
 			}
 		}
 	}
@@ -202,4 +160,8 @@ func (m *Manager) buttonPress(x *xgb.Conn, ev xproto.ButtonPressEvent, double bo
 			m.ToggleFullscreen(x, ev.Child)
 		}
 	}
+}
+
+func (m *Manager) WID() xproto.Window {
+	return m.wid
 }

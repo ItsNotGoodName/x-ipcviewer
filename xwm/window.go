@@ -1,12 +1,10 @@
 package xwm
 
-import "github.com/jezek/xgb/xproto"
+import (
+	"log"
 
-type WindowConfig struct {
-	MainStream string
-	SubStream  string
-	Background bool
-}
+	"github.com/jezek/xgb/xproto"
+)
 
 type Window struct {
 	wid        xproto.Window
@@ -16,21 +14,21 @@ type Window struct {
 	background bool
 }
 
-func NewWindow(wid xproto.Window, player Player, config WindowConfig) Window {
-	if config.SubStream == "" {
-		config.SubStream = config.MainStream
+func NewWindow(wid xproto.Window, player Player, mainStream, subStream string, background bool) Window {
+	if subStream == "" {
+		subStream = mainStream
 	}
 
 	return Window{
 		wid:        wid,
 		player:     player,
-		mainStream: config.MainStream,
-		subStream:  config.SubStream,
-		background: config.Background,
+		mainStream: mainStream,
+		subStream:  subStream,
+		background: background,
 	}
 }
 
-func (c Window) Show(focus, fullscreen bool) error {
+func (c Window) Show(focus, fullscreen bool) {
 	var stream string
 	if fullscreen {
 		stream = c.mainStream
@@ -38,22 +36,30 @@ func (c Window) Show(focus, fullscreen bool) error {
 		stream = c.subStream
 	}
 	if err := c.player.Play(stream); err != nil {
-		return err
+		log.Println("xwm.Window.Show: Play:", err)
 	}
 
-	return c.player.Mute(!focus)
+	if err := c.player.Mute(!focus); err != nil {
+		log.Println("xwm.Window.Show: Mute:", err)
+	}
 }
 
-func (c Window) Hide() error {
+func (c Window) Hide() {
 	if c.background {
 		if err := c.player.Play(c.subStream); err != nil {
-			return err
+			log.Println("xwm.Window.Show: Play:", err)
 		}
 
-		return c.player.Mute(true)
+		if err := c.player.Mute(true); err != nil {
+			log.Println("xwm.Window.Show: Mute:", err)
+		}
+
+		return
 	}
 
-	return c.player.Stop()
+	if err := c.player.Stop(); err != nil {
+		log.Println("xwm.Window.Show: Stop:", err)
+	}
 }
 
 func (c Window) Release() {

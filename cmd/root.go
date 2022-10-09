@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 
 	"github.com/ItsNotGoodName/x-ipc-viewer/config"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
@@ -74,11 +75,29 @@ to quickly create a Cobra application.`,
 		}()
 
 		// Windows
-		for _, window := range conf.Windows {
-			if err := manager.AddWindow(x, mpv.NewPlayer, xwm.WindowConfig{MainStream: window.Main, SubStream: window.Sub, Background: conf.Background}); err != nil {
-				log.Fatalln(err)
-			}
+		windows := make([]xwm.Window, len(conf.Windows))
+		wg := sync.WaitGroup{}
+		for i := range conf.Windows {
+			wg.Add(1)
+			go func(i int) {
+				w, err := xwm.CreateXSubWindow(x, manager.WID())
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				p, err := mpv.NewPlayer(w)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				windows[i] = xwm.NewWindow(w, p, conf.Windows[i].Main, conf.Windows[i].Sub, conf.Background)
+
+				wg.Done()
+			}(i)
 		}
+		wg.Wait()
+
+		manager.AddWindows(x, windows)
 
 		xwm.HandleEvent(x, manager)
 	},
