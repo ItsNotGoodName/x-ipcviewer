@@ -21,7 +21,7 @@ type Manager struct {
 	windows           []Window
 }
 
-func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manager, error) {
+func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, cursor xproto.Cursor, m mosaic.Mosaic) (*Manager, error) {
 	width, height := screen.WidthInPixels, screen.HeightInPixels
 
 	// Generate x window id
@@ -36,12 +36,13 @@ func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manag
 		wid, screen.Root,
 		0, 0, width, height, 0,
 		xproto.WindowClassInputOutput, screen.RootVisual,
-		xproto.CwBackPixel|xproto.CwEventMask,
+		xproto.CwBackPixel|xproto.CwEventMask|xproto.CwCursor,
 		[]uint32{
-			000000000,
+			0,
 			xproto.EventMaskStructureNotify |
 				xproto.EventMaskKeyPress |
 				xproto.EventMaskButtonPress,
+			uint32(cursor),
 		}).Check(); err != nil {
 		return nil, err
 	}

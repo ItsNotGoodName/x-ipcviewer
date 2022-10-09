@@ -31,6 +31,7 @@ import (
 	"github.com/ItsNotGoodName/x-ipc-viewer/config"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
+	"github.com/ItsNotGoodName/x-ipc-viewer/xcursor"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
@@ -39,7 +40,7 @@ import (
 )
 
 var cfgFile string
-var conf config.Config
+var cfg config.Config
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -60,8 +61,14 @@ to quickly create a Cobra application.`,
 		}
 		defer x.Close()
 
+		// Cursor
+		cursor, err := xcursor.CreateCursor(x, xcursor.LeftPtr)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		// Manager
-		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), mosaic.NewMosaic(mosaic.NewLayoutGridCount(len(conf.Windows))))
+		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), cursor, mosaic.NewMosaic(mosaic.NewLayoutGridCount(len(cfg.Windows))))
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -75,9 +82,9 @@ to quickly create a Cobra application.`,
 		}()
 
 		// Windows
-		windows := make([]xwm.Window, len(conf.Windows))
+		windows := make([]xwm.Window, len(cfg.Windows))
 		wg := sync.WaitGroup{}
-		for i := range conf.Windows {
+		for i := range cfg.Windows {
 			wg.Add(1)
 			go func(i int) {
 				w, err := xwm.CreateXSubWindow(x, manager.WID())
@@ -90,7 +97,7 @@ to quickly create a Cobra application.`,
 					log.Fatal(err)
 				}
 
-				windows[i] = xwm.NewWindow(w, p, conf.Windows[i].Main, conf.Windows[i].Sub, conf.Background)
+				windows[i] = xwm.NewWindow(w, p, cfg.Windows[i].Main, cfg.Windows[i].Sub, cfg.Background)
 
 				wg.Done()
 			}(i)
@@ -148,7 +155,7 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 
-		if err = viper.Unmarshal(&conf); err != nil {
+		if err = viper.Unmarshal(&cfg); err != nil {
 			log.Fatalf("Unable to decode into struct, %v", err)
 		}
 	}
