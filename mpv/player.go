@@ -95,19 +95,13 @@ func (p Player) Mute(mute bool) error {
 }
 
 func (p Player) Play(stream string) error {
-	_, err := p.conn.Call("loadfile", stream)
-	if err == nil {
-		p.streamC <- stream
-	}
-	return err
+	p.streamC <- stream
+	return nil
 }
 
 func (p Player) Stop() error {
-	_, err := p.conn.Call("stop")
-	if err == nil {
-		p.streamC <- ""
-	}
-	return err
+	p.streamC <- ""
+	return nil
 }
 
 func (p Player) Release() {

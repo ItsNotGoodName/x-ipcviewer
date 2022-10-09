@@ -30,21 +30,20 @@ func NewManager(x *xgb.Conn, screen *xproto.ScreenInfo, m mosaic.Mosaic) (*Manag
 	}
 
 	// Create main x window
-	if err := xproto.CreateWindowChecked(x, screen.RootDepth, wid, screen.Root,
-		0, 0, width, height, 0,
-		xproto.WindowClassInputOutput, screen.RootVisual, 0, []uint32{}).Check(); err != nil {
-		return nil, err
-	}
-
 	// Set x window background to black and listen for resize, key presses, and button presses
-	xproto.ChangeWindowAttributesChecked(x, wid,
+	if err := xproto.CreateWindowChecked(x, screen.RootDepth,
+		wid, screen.Root,
+		0, 0, width, height, 0,
+		xproto.WindowClassInputOutput, screen.RootVisual,
 		xproto.CwBackPixel|xproto.CwEventMask,
 		[]uint32{
-			0x00000000,
+			000000000,
 			xproto.EventMaskStructureNotify |
 				xproto.EventMaskKeyPress |
 				xproto.EventMaskButtonPress,
-		})
+		}).Check(); err != nil {
+		return nil, err
+	}
 
 	// Show x window
 	if err = xproto.MapWindowChecked(x, wid).Check(); err != nil {
@@ -71,9 +70,10 @@ func (m *Manager) AddWindow(x *xgb.Conn, factory PlayerFactory, config WindowCon
 	}
 
 	// Create x window in root
-	if xproto.CreateWindow(x, m.screen.RootDepth, wid, m.WID,
+	if xproto.CreateWindowChecked(x, m.screen.RootDepth,
+		wid, m.WID,
 		0, 0, 1, 1, 0,
-		xproto.WindowClassInputOutput, m.screen.RootVisual, 0, []uint32{}).Check(); err != nil {
+		xproto.WindowClassInputOutput, xproto.WindowClassCopyFromParent, 0, []uint32{}).Check(); err != nil {
 		return err
 	}
 
