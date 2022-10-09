@@ -75,6 +75,10 @@ func (m *Manager) AddWindows(x *xgb.Conn, windows []Window) {
 }
 
 func (m *Manager) ToggleFullscreen(x *xgb.Conn, wid xproto.Window) {
+	if wid == 0 && m.fullscreenWid == wid {
+		return
+	}
+
 	if wid == 0 || wid == m.fullscreenWid {
 		// Normal
 		m.fullscreenWid = 0
