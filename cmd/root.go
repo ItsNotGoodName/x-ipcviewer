@@ -45,13 +45,7 @@ var cfg config.Config
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "x-ipc-viewer",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "IP camera viewer for X11.",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
@@ -87,16 +81,20 @@ to quickly create a Cobra application.`,
 		for i := range cfg.Windows {
 			wg.Add(1)
 			go func(i int) {
+				// Create X window
 				w, err := xwm.CreateXSubWindow(x, manager.WID())
 				if err != nil {
 					log.Fatal(err)
 				}
 
+				// Create player
 				p, err := mpv.NewPlayer(w)
 				if err != nil {
 					log.Fatal(err)
 				}
+				p = xwm.NewPlayerCache(p)
 
+				// Create window
 				windows[i] = xwm.NewWindow(w, p, cfg.Windows[i].Main, cfg.Windows[i].Sub, cfg.Background)
 
 				wg.Done()
@@ -130,7 +128,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // initConfig reads in config file and ENV variables if set.

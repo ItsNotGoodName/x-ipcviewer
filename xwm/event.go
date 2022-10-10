@@ -1,7 +1,7 @@
 package xwm
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
@@ -17,28 +17,28 @@ func HandleEvent(x *xgb.Conn, eh EventHandler) {
 	for {
 		ev, err := x.WaitForEvent()
 		if ev == nil && err == nil {
-			fmt.Println("Both event and error are nil. Exiting...")
+			log.Println("xwm.HandleEvent: exit: no event or error")
 			return
 		}
 
 		if err != nil {
-			fmt.Printf("Error: %s\n", err)
-		}
-
-		if ev != nil {
-			fmt.Printf("Event: %s\n", ev)
+			log.Println("xwm.HandleEvent: error:", err)
 		}
 
 		switch ev := ev.(type) {
 		case xproto.ConfigureNotifyEvent:
+			log.Println("xwm.HandleEvent:", ev)
+
 			eh.ConfigureNotify(x, ev)
 		case xproto.ButtonPressEvent:
-			fmt.Printf("Button pressed: %d\n", ev.Detail)
+			log.Println("xwm.HandleEvent: button press event:", ev.Detail)
 
 			eh.ButtonPress(x, ev)
 		case xproto.KeyPressEvent:
-			fmt.Printf("Key pressed: %d\n", ev.Detail)
-			if ev.Detail == 24 {
+			log.Println("xwm.HandleEvent: key press event:", ev.Detail)
+
+			if ev.Detail == 24 { // q
+				log.Println("xwm.HandleEvent: exit: quit key pressed")
 				return
 			}
 
@@ -63,7 +63,11 @@ func HandleEvent(x *xgb.Conn, eh EventHandler) {
 			// For more information about closing windows while maintaining
 			// the X connection see
 			// https://github.com/jezek/xgbutil/blob/master/_examples/graceful-window-close/main.go
+			log.Println("xwm.HandleEvent: exit: destroy notify event")
+
 			return
+		default:
+			log.Println("xwm.HandleEvent: unknown event:", ev)
 		}
 	}
 }

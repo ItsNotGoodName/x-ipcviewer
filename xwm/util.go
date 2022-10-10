@@ -6,13 +6,13 @@ import (
 )
 
 func CreateXSubWindow(x *xgb.Conn, root xproto.Window) (xproto.Window, error) {
-	// Generate x window id
+	// Generate X window id
 	wid, err := xproto.NewWindowId(x)
 	if err != nil {
 		return 0, err
 	}
 
-	// Create x window in root
+	// Create X window in root
 	if xproto.CreateWindowChecked(x, xproto.WindowClassCopyFromParent,
 		wid, root,
 		0, 0, 1, 1, 0,
@@ -20,15 +20,11 @@ func CreateXSubWindow(x *xgb.Conn, root xproto.Window) (xproto.Window, error) {
 		return 0, err
 	}
 
-	// Show x window
+	// Show X window
 	if err = xproto.MapWindowChecked(x, wid).Check(); err != nil {
 		xproto.DestroyWindow(x, wid)
 		return 0, err
 	}
 
 	return wid, nil
-}
-
-func DestroyXWindow(x *xgb.Conn, wid xproto.Window) error {
-	return xproto.DestroyWindow(x, wid).Check()
 }

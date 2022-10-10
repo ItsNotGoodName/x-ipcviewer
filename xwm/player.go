@@ -8,7 +8,7 @@ type Player interface {
 	Mute(mute bool) error
 	// Play this stream.
 	Play(stream string) error
-	// Stop playing this stream.
+	// Stop playing current stream.
 	Stop() error
 	// Release held resources.
 	Release()
