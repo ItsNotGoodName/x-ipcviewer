@@ -153,8 +153,13 @@ func (m *Manager) KeyPress(x *xgb.Conn, ev xproto.KeyPressEvent) {
 }
 
 func (m *Manager) ButtonPress(x *xgb.Conn, ev xproto.ButtonPressEvent) {
-	m.buttonPress(x, ev, (ev.Detail == m.lastButtonPressEv.Detail && (ev.Time-m.lastButtonPressEv.Time) < 500))
-	m.lastButtonPressEv = ev
+	double := (ev.Detail == m.lastButtonPressEv.Detail && (ev.Time-m.lastButtonPressEv.Time) < 500)
+	m.buttonPress(x, ev, double)
+	if double {
+		m.lastButtonPressEv = xproto.ButtonPressEvent{}
+	} else {
+		m.lastButtonPressEv = ev
+	}
 }
 
 func (m *Manager) buttonPress(x *xgb.Conn, ev xproto.ButtonPressEvent, double bool) {
