@@ -4,30 +4,56 @@ IP camera viewer for X11.
 
 # Features
 
-- Handle main and sub stream.
-- Auto grid layout.
-- Fullscreen view.
-- Uses [mpv](https://mpv.io) with hardware decoding and low latency profile.
+- [mpv](https://mpv.io) with hardware decoding and low latency profile.
+- Main and sub stream.
 - Streams restart when they are out of sync.
+- Window layouts.
+  - Auto grid.
+  - Manual.
+- Fullscreen view.
 
 # Key Bindings
 
-| Key | Mouse          | Action               |
-| --- | -------------- | -------------------- |
-| q   |                | Quit                 |
-| 1-9 | 2 x Left Click | Toggle Fullscreen    |
-| 0   |                | Activate Normal View |
+| Key | Mouse          | Action                 |
+| --- | -------------- | ---------------------- |
+| q   |                | Quit                   |
+| 1-9 | 2 x Left Click | Toggle Fullscreen View |
+| 0   |                | Activate Normal View   |
 
 # Config
 
 Located at `~/.x-ipc-viewer.yml`.
 
-```yaml
-background: false # Keep streams playing when they are not in view.
+Keys are NOT case sensitive.
 
-windows: # List of IP camera windows.
-  - main: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0 # Main stream used in fullscreen and/or normal view.
-    sub: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=1 # Sub stream used in normal view. (optional)
+```yaml
+# Keep streams playing when they are not in view.
+Background: false
+
+# Layout for windows, [auto, manual]
+Layout: auto
+
+# Manual layout for windows, 'Layout' must be 'manual'.
+# Define x, y, w (width), and h (height) as ratios of the full width and height.
+# Ratios can be fractions or numbers. Coordinates start from the top left corner.
+LayoutManual:
+  - X: 0
+    Y: 0
+    W: .5
+    H: 1
+  - X: 0.5
+    Y: 0
+    W: 1/2
+    H: 1/2
+  - X: 1/2
+    Y: 1/2
+    W: 1/2
+    H: 1/2
+
+# List of IP camera windows.
+Windows:
+  - Main: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0 # Main stream used in fullscreen and/or normal view.
+    Sub: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=1 # Sub stream used in normal view. (optional)
 ```
 
 # Setup
@@ -94,10 +120,10 @@ unclutter &
 
 # To Do
 
-- Add more layouts.
+- ~~Add more layouts.~~
 - Add configurable [mpv](https://mpv.io) flags for each window.
-- Share audio between windows.
 - Add left click to focus window.
 - Add multi-monitor support.
-- Zooming.
+- Share audio between windows.
 - Make switching between main and sub stream more seamless.
+- Zooming.

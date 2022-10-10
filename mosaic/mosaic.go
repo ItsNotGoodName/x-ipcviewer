@@ -2,10 +2,10 @@ package mosaic
 
 type (
 	Window struct {
-		X      uint16
-		Y      uint16
-		Width  uint16
-		Height uint16
+		X uint16
+		Y uint16
+		W uint16
+		H uint16
 	}
 
 	Mosaic struct {
@@ -15,22 +15,18 @@ type (
 
 	Layout interface {
 		Count() int
-		Update(wins []Window, w, h uint16)
+		update(wins []Window, w, h uint16)
 	}
 )
 
-func NewMosaic(layout Layout) Mosaic {
-	m := Mosaic{}
-	m.SetLayout(layout)
-	return m
+func New(layout Layout) Mosaic {
+	return Mosaic{
+		layout:  layout,
+		windows: make([]Window, layout.Count()),
+	}
 }
 
-func (m *Mosaic) SetLayout(layout Layout) {
-	m.layout = layout
-	m.windows = make([]Window, layout.Count())
-}
-
-func (m *Mosaic) Windows(w, h uint16) []Window {
-	m.layout.Update(m.windows, w, h)
+func (m Mosaic) Windows(w, h uint16) []Window {
+	m.layout.update(m.windows, w, h)
 	return m.windows
 }

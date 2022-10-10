@@ -111,7 +111,7 @@ func (m *Manager) Update(x *xgb.Conn) {
 		for i := 0; i < windowsLength && i < mosaicWindowsLength; i++ {
 			window := m.windows[i]
 
-			if err := xproto.ConfigureWindowChecked(x, window.wid, xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight, []uint32{uint32(mosaicWindows[i].X), uint32(mosaicWindows[i].Y), uint32(mosaicWindows[i].Width), uint32(mosaicWindows[i].Height)}).Check(); err != nil {
+			if err := xproto.ConfigureWindowChecked(x, window.wid, xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight, []uint32{uint32(mosaicWindows[i].X), uint32(mosaicWindows[i].Y), uint32(mosaicWindows[i].W), uint32(mosaicWindows[i].H)}).Check(); err != nil {
 				log.Printf("xwm.Manager.Update: window %d: %s\n", window.wid, err)
 			}
 		}

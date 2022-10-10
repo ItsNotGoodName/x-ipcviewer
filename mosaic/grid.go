@@ -29,7 +29,7 @@ func (l LayoutGrid) Count() int {
 	return l.xc * l.yc
 }
 
-func (l LayoutGrid) Update(wins []Window, w, h uint16) {
+func (l LayoutGrid) update(wins []Window, w, h uint16) {
 	fw := uint16(float32(w) * (1.0 / float32(l.xc)))
 	fh := uint16(float32(h) * (1.0 / float32(l.yc)))
 
@@ -38,7 +38,7 @@ func (l LayoutGrid) Update(wins []Window, w, h uint16) {
 		for j := 0; j < l.xc; j++ {
 			fx := fw * uint16(j)
 			idx := (i * l.xc) + j
-			wins[idx].X, wins[idx].Y, wins[idx].Width, wins[idx].Height = fx, fy, fw, fh
+			wins[idx].X, wins[idx].Y, wins[idx].W, wins[idx].H = fx, fy, fw, fh
 		}
 	}
 }

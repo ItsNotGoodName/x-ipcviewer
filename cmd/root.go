@@ -61,8 +61,16 @@ var rootCmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 
+		// Layout
+		var layout mosaic.Layout
+		if cfg.Layout.IsAuto() {
+			layout = mosaic.NewLayoutGridCount(len(cfg.Windows))
+		} else {
+			layout = mosaic.NewLayoutManual(cfg.LayoutManualWindows)
+		}
+
 		// Manager
-		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), cursor, mosaic.NewMosaic(mosaic.NewLayoutGridCount(len(cfg.Windows))))
+		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), cursor, mosaic.New(layout))
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -153,8 +161,8 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 
-		if err = viper.Unmarshal(&cfg); err != nil {
-			log.Fatalf("Unable to decode into struct, %v", err)
+		if err = config.Decode(&cfg); err != nil {
+			log.Fatalf("unable to decode into struct: %v", err)
 		}
 	}
 }
