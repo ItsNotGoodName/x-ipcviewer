@@ -38,8 +38,10 @@ cloud.google.com/go/storage v1.14.0/go.mod h1:GrKmX003DSIwi9o29oFT7YDnHYwZoctc3f
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/ItsNotGoodName/mpvipc v0.0.0-20221004104251-2fa703cd7795 h1:dcMY9nDdh8RVd43faQiSq5SoOo3PgRiCdjIQkFG56+8=
-github.com/ItsNotGoodName/mpvipc v0.0.0-20221004104251-2fa703cd7795/go.mod h1:H9qOEib1Q1MhhZh6q4TuAxQp7kQjHZe+NaiN0L23Rro=
+github.com/ItsNotGoodName/mpvipc v0.0.0-20221010000610-75dcc396540e h1:1PcltpXfOq2J6jG/Ctn6OZkwvRcHoiu8ge8PdeTdUqk=
+github.com/ItsNotGoodName/mpvipc v0.0.0-20221010000610-75dcc396540e/go.mod h1:H9qOEib1Q1MhhZh6q4TuAxQp7kQjHZe+NaiN0L23Rro=
+github.com/avast/retry-go/v3 v3.1.1 h1:49Scxf4v8PmiQ/nY0aY3p0hDueqSmc7++cBbtiDGu2g=
+github.com/avast/retry-go/v3 v3.1.1/go.mod h1:6cXRK369RpzFL3UQGqIUp9Q7GDrams+KsYWrfNA1/nQ=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/chzyer/logex v1.1.10/go.mod h1:+Ywpsq7O8HXn0nuIou7OrIPyXbp3wmkHB+jjWRnGsAI=
 github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5PlCu98SY8svDHJxuZscDgtXS6KTTbou5AhLI=

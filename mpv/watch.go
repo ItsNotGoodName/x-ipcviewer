@@ -15,7 +15,7 @@ func flag(c chan struct{}) {
 	}
 }
 
-func watch(p Player, eventC chan *mpvipc.Event) {
+func watch(p Player, eventC <-chan *mpvipc.Event) {
 	// modifiable by p.streamC
 	var stream string
 	var shouldPlay bool

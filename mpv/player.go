@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/ItsNotGoodName/mpvipc"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
+	"github.com/avast/retry-go/v3"
 	"github.com/google/uuid"
 	"github.com/jezek/xgb/xproto"
 )
@@ -31,34 +31,32 @@ func NewPlayer(wid xproto.Window) (xwm.Player, error) {
 	// Start mpv
 	cmd := exec.Command(
 		"mpv",
-		fmt.Sprintf("--wid=%d", wid),
+		fmt.Sprintf("--input-unix-socket=%s", socketPath), // mpvipc
+		fmt.Sprintf("--wid=%d", wid),                      // bind to x window
+		"--input-vo-keyboard=no",                          // passthrough keyboard input to sub x window
+		"--no-input-cursor",                               // passthrough mouse input to sub x window
+		"--no-osc",                                        // don't render on-screen-ui
+		"--force-window",                                  // render empty video when no file-loaded
+		"--idle",                                          // keep window open when no file-loaded
 		"--vo=gpu",
 		"--hwdec=auto",
 		"--profile=low-latency",
 		"--no-cache",
-		"--input-vo-keyboard=no",
-		"--no-input-cursor",
-		"--no-osc",
-		"--force-window",
-		"--idle",
 		"--loop-file=inf",
-		fmt.Sprintf("--input-unix-socket=%s", socketPath),
 	)
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
 
 	// Open connection
-	var conn *mpvipc.Connection
-	eventC := make(chan *mpvipc.Event, 50)
-	for {
-		conn = mpvipc.NewConnection(socketPath)
-		if err := conn.Open(eventC); err == nil {
-			fmt.Println("connected to " + socketPath)
-			break
-		}
-
-		time.Sleep(100 * time.Millisecond)
+	conn := mpvipc.NewConnection(socketPath)
+	var eventC <-chan *mpvipc.Event
+	if err := retry.Do(func() error {
+		var err error
+		eventC, err = conn.Open(50)
+		return err
+	}, retry.Attempts(50), retry.DelayType(retry.FixedDelay)); err != nil {
+		return nil, err
 	}
 
 	// Setup event observers
@@ -74,7 +72,7 @@ func NewPlayer(wid xproto.Window) (xwm.Player, error) {
 	p := Player{
 		cmd:        cmd,
 		conn:       conn,
-		streamC:    make(chan string),
+		streamC:    make(chan string, 1),
 		socketPath: socketPath,
 	}
 
@@ -95,13 +93,23 @@ func (p Player) Mute(mute bool) error {
 }
 
 func (p Player) Play(stream string) error {
-	p.streamC <- stream
-	return nil
+	for {
+		select {
+		case p.streamC <- stream:
+			return nil
+		case <-p.streamC:
+		}
+	}
 }
 
 func (p Player) Stop() error {
-	p.streamC <- ""
-	return nil
+	for {
+		select {
+		case p.streamC <- "":
+			return nil
+		case <-p.streamC:
+		}
+	}
 }
 
 func (p Player) Release() {

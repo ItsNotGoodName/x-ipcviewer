@@ -3,7 +3,8 @@ module github.com/ItsNotGoodName/x-ipc-viewer
 go 1.19
 
 require (
-	github.com/ItsNotGoodName/mpvipc v0.0.0-20221004104251-2fa703cd7795
+	github.com/ItsNotGoodName/mpvipc v0.0.0-20221010000610-75dcc396540e
+	github.com/avast/retry-go/v3 v3.1.1
 	github.com/google/uuid v1.3.0
 	github.com/jezek/xgb v1.0.1
 	github.com/spf13/cobra v1.5.0
