@@ -89,7 +89,7 @@ func watch(p Player, eventC <-chan *mpvipc.Event) {
 					if event.ID == event_demuxer_cache_time {
 						// Ping
 						pingT.Reset(pingD)
-					} else if event.ID == event_demuxer_cache_idle && isPlaying && event.Data != nil && event.Data.(bool) {
+					} else if event.ID == event_demuxer_cache_idle && isPlaying && p.lowLatency && event.Data != nil && event.Data.(bool) {
 						// Reload stream if cache is idle and is a rtsp stream
 						log.Printf("mpv.watch: %s: queuing reload: no longer caching", p.socketPath)
 						flag(reloadStreamC)

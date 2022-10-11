@@ -95,8 +95,11 @@ var rootCmd = &cobra.Command{
 					log.Fatal(err)
 				}
 
+				// Crate player factory
+				pf := mpv.NewPlayerFactory(cfg.Windows[i].Flags, cfg.Player.GPU, cfg.Windows[i].LowLatency)
+
 				// Create player
-				p, err := mpv.NewPlayer(w)
+				p, err := pf(w)
 				if err != nil {
 					log.Fatal(err)
 				}

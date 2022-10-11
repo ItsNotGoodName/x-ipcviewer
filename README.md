@@ -9,7 +9,7 @@ IP camera viewer for X11.
 - Streams restart when they are out of sync.
 - Window layouts.
   - Auto grid.
-  - Manual.
+  - Manual placement.
 - Fullscreen view.
 
 # Key Bindings
@@ -35,7 +35,8 @@ Layout: auto
 
 # Manual layout for windows, 'Layout' must be 'manual'.
 # Define x, y, w (width), and h (height) as ratios of the full width and height.
-# Ratios can be fractions or numbers. Coordinates start from the top left corner.
+# Ratios can be fractions or numbers.
+# Coordinates start from the top left corner.
 LayoutManual:
   - X: 0
     Y: 0
@@ -50,10 +51,18 @@ LayoutManual:
     W: 1/2
     H: 1/2
 
+# Mpv player configuration.
+Player:
+  GPU: auto # The hardware decoding api to use. (--hwdec=<api>)
+  LowLatency: true # Enable low-latency profile and disable cache.
+  Flags: [] # Mpv flags.
+
 # List of IP camera windows.
 Windows:
   - Main: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0 # Main stream used in fullscreen and/or normal view.
     Sub: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=1 # Sub stream used in normal view. (optional)
+    LowLatency: true
+    Flags: []
 ```
 
 # Setup
@@ -121,7 +130,7 @@ unclutter &
 # To Do
 
 - ~~Add more layouts.~~
-- Add configurable [mpv](https://mpv.io) flags for each window.
+- ~~Add configurable [mpv](https://mpv.io) flags for each window.~~
 - Add left click to focus window.
 - Add multi-monitor support.
 - Share audio between windows.
