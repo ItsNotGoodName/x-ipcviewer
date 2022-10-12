@@ -54,15 +54,16 @@ LayoutManual:
 # Mpv player configuration.
 Player:
   GPU: auto # The hardware decoding api to use. (--hwdec=<api>)
-  LowLatency: true # Enable low-latency profile and disable cache.
   Flags: [] # Mpv flags.
 
-# List of IP camera windows.
+# List of windows.
 Windows:
   - Main: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0 # Main stream used in fullscreen and/or normal view.
     Sub: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=1 # Sub stream used in normal view. (optional)
-    LowLatency: true
-    Flags: []
+    LowLatency: true # Enable low-latency profile and disable cache.
+  - Main: /foo.mp4
+    Flags:
+      - --no-keepaspect # Stretch.
 ```
 
 # Setup

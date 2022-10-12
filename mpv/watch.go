@@ -2,7 +2,6 @@ package mpv
 
 import (
 	"log"
-	"strings"
 	"time"
 
 	"github.com/ItsNotGoodName/mpvipc"
@@ -15,17 +14,16 @@ func flag(c chan struct{}) {
 	}
 }
 
-func watch(p Player, eventC <-chan *mpvipc.Event) {
+func (p Player) watch(eventC <-chan *mpvipc.Event) {
 	// modifiable by p.streamC
 	var stream string
 	var shouldPlay bool
-	var isRtspStream bool
 
 	// modifiable by eventC
 	var isPlaying bool
 
 	// modifiable by eventC and pingT.C
-	pingD := 5 * time.Second
+	pingD := 10 * time.Second
 	pingT := time.NewTicker(pingD)
 
 	reloadStreamC := make(chan struct{}, 1)
@@ -47,7 +45,6 @@ func watch(p Player, eventC <-chan *mpvipc.Event) {
 				}
 			}
 		case stream = <-p.streamC:
-			isRtspStream = strings.HasPrefix(stream, "rtsp://")
 			shouldPlay = stream != ""
 			flag(reloadStreamC)
 		case <-pingT.C:
@@ -63,19 +60,11 @@ func watch(p Player, eventC <-chan *mpvipc.Event) {
 			case "start-file":
 				log.Printf("mpv.watch: %s: event: %s", p.socketPath, event.Name)
 				isPlaying = false
-				if isRtspStream {
-					pingT.Reset(pingD)
-				} else {
-					pingT.Stop()
-				}
+				pingT.Reset(pingD)
 			case "file-loaded":
 				log.Printf("mpv.watch: %s: event: %s", p.socketPath, event.Name)
 				isPlaying = true
-				if isRtspStream {
-					pingT.Reset(pingD)
-				} else {
-					pingT.Stop()
-				}
+				pingT.Reset(pingD)
 			case "end-file":
 				log.Printf("mpv.watch: %s: event: %s", p.socketPath, event.Name)
 				isPlaying = false
@@ -85,15 +74,13 @@ func watch(p Player, eventC <-chan *mpvipc.Event) {
 				isPlaying = false
 				pingT.Reset(pingD)
 			default:
-				if isRtspStream {
-					if event.ID == event_demuxer_cache_time {
-						// Ping
-						pingT.Reset(pingD)
-					} else if event.ID == event_demuxer_cache_idle && isPlaying && p.lowLatency && event.Data != nil && event.Data.(bool) {
-						// Reload stream if cache is idle and is a rtsp stream
-						log.Printf("mpv.watch: %s: queuing reload: no longer caching", p.socketPath)
-						flag(reloadStreamC)
-					}
+				if event.ID == event_demuxer_cache_time {
+					// Ping
+					pingT.Reset(pingD)
+				} else if event.ID == event_demuxer_cache_idle && isPlaying && p.lowLatency && event.Data != nil && event.Data.(bool) {
+					// Reload stream if cache is idle and is a rtsp stream
+					log.Printf("mpv.watch: %s: queuing reload: no longer caching", p.socketPath)
+					flag(reloadStreamC)
 				}
 			}
 		}

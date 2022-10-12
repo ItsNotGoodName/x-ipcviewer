@@ -8,14 +8,8 @@ import (
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
 )
 
-type Layout string
-
-func (c Layout) IsAuto() bool {
-	return c == "" || c == "auto"
-}
-
-func (c Layout) IsManual() bool {
-	return c == "manual"
+type ConfigLayoutManual struct {
+	LayoutManual []LayoutManual
 }
 
 type LayoutManual struct {
@@ -25,7 +19,7 @@ type LayoutManual struct {
 	H string
 }
 
-func parseRatio(ratio string) (float32, error) {
+func calculateRatio(ratio string) (float32, error) {
 	if num, err := strconv.ParseFloat(ratio, 32); err == nil {
 		return float32(num), err
 	}
@@ -49,23 +43,23 @@ func parseRatio(ratio string) (float32, error) {
 	return 0, fmt.Errorf("%s: invalid float", ratio)
 }
 
-func parseLayoutManualWindow(lmr LayoutManual) (mosaic.LayoutManualWindow, error) {
-	x, err := parseRatio(lmr.X)
+func parseLayoutManualWindow(lm LayoutManual) (mosaic.LayoutManualWindow, error) {
+	x, err := calculateRatio(lm.X)
 	if err != nil {
 		return mosaic.LayoutManualWindow{}, fmt.Errorf("X=%w", err)
 	}
 
-	y, err := parseRatio(lmr.Y)
+	y, err := calculateRatio(lm.Y)
 	if err != nil {
 		return mosaic.LayoutManualWindow{}, fmt.Errorf("Y=%w", err)
 	}
 
-	w, err := parseRatio(lmr.W)
+	w, err := calculateRatio(lm.W)
 	if err != nil {
 		return mosaic.LayoutManualWindow{}, fmt.Errorf("W=%w", err)
 	}
 
-	h, err := parseRatio(lmr.H)
+	h, err := calculateRatio(lm.H)
 	if err != nil {
 		return mosaic.LayoutManualWindow{}, fmt.Errorf("H=%w", err)
 	}

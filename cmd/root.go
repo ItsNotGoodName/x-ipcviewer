@@ -25,16 +25,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"sync"
 
+	"github.com/ItsNotGoodName/x-ipc-viewer/app"
 	"github.com/ItsNotGoodName/x-ipc-viewer/config"
-	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
-	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
-	"github.com/ItsNotGoodName/x-ipc-viewer/xcursor"
-	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
-	"github.com/jezek/xgb"
-	"github.com/jezek/xgb/xproto"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -49,73 +42,9 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		x, err := xgb.NewConn()
-		if err != nil {
+		if err := app.Run(&cfg); err != nil {
 			log.Fatalln(err)
 		}
-		defer x.Close()
-
-		// Cursor
-		cursor, err := xcursor.CreateCursor(x, xcursor.LeftPtr)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		// Layout
-		var layout mosaic.Layout
-		if cfg.Layout.IsAuto() {
-			layout = mosaic.NewLayoutGridCount(len(cfg.Windows))
-		} else {
-			layout = mosaic.NewLayoutManual(cfg.LayoutManualWindows)
-		}
-
-		// Manager
-		manager, err := xwm.NewManager(x, xproto.Setup(x).DefaultScreen(x), cursor, mosaic.New(layout))
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer manager.Release()
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		go func() {
-			<-c
-			manager.Release()
-			os.Exit(1)
-		}()
-
-		// Windows
-		windows := make([]xwm.Window, len(cfg.Windows))
-		wg := sync.WaitGroup{}
-		for i := range cfg.Windows {
-			wg.Add(1)
-			go func(i int) {
-				// Create X window
-				w, err := xwm.CreateXSubWindow(x, manager.WID())
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				// Crate player factory
-				pf := mpv.NewPlayerFactory(cfg.Windows[i].Flags, cfg.Player.GPU, cfg.Windows[i].LowLatency)
-
-				// Create player
-				p, err := pf(w)
-				if err != nil {
-					log.Fatal(err)
-				}
-				p = xwm.NewPlayerCache(p)
-
-				// Create window
-				windows[i] = xwm.NewWindow(w, p, cfg.Windows[i].Main, cfg.Windows[i].Sub, cfg.Background)
-
-				wg.Done()
-			}(i)
-		}
-		wg.Wait()
-
-		manager.AddWindows(x, windows)
-
-		xwm.HandleEvent(x, manager)
 	},
 }
 
@@ -164,7 +93,7 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 
-		if err = config.Decode(&cfg); err != nil {
+		if err = config.Parse(&cfg); err != nil {
 			log.Fatalf("unable to decode into struct: %v", err)
 		}
 	}

@@ -27,7 +27,6 @@ type Player struct {
 }
 
 const DefaultGPU string = "auto"
-const DefaultLowLatency bool = true
 
 func NewPlayerFactory(flags []string, gpu string, lowLatency bool) xwm.PlayerFactory {
 	return func(wid xproto.Window) (xwm.Player, error) {
@@ -87,10 +86,9 @@ func NewPlayerFactory(flags []string, gpu string, lowLatency bool) xwm.PlayerFac
 			lowLatency: lowLatency,
 		}
 
-		go watch(p, eventC)
+		go p.watch(eventC)
 
 		return p, nil
-
 	}
 }
 
