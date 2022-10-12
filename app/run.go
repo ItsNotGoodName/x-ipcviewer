@@ -1,6 +1,7 @@
 package app
 
 import (
+	"math"
 	"os"
 	"os/signal"
 	"sync"
@@ -51,7 +52,7 @@ func Run(cfg *config.Config) error {
 	defer manager.Release()
 
 	// Create windows
-	windows, err := createWindows(cfg, x, manager.WID())
+	windows, err := createWindows(cfg, x, manager.WID(), layout)
 	if err != nil {
 		return err
 	}
@@ -65,12 +66,14 @@ func Run(cfg *config.Config) error {
 	return nil
 }
 
-func createWindows(cfg *config.Config, x *xgb.Conn, root xproto.Window) ([]xwm.Window, error) {
-	players := make([]xwm.Player, len(cfg.Windows))
-	windows := make([]xwm.Window, len(cfg.Windows))
+func createWindows(cfg *config.Config, x *xgb.Conn, root xproto.Window, layout mosaic.Layout) ([]xwm.Window, error) {
+	count := int(math.Min(float64(layout.Count()), float64(len(cfg.Windows))))
+
+	players := make([]xwm.Player, count)
+	windows := make([]xwm.Window, count)
 	wg := sync.WaitGroup{}
-	errC := make(chan error, len(cfg.Windows))
-	for i := range cfg.Windows {
+	errC := make(chan error, count)
+	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
