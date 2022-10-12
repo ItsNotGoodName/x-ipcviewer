@@ -19,16 +19,17 @@ const (
 )
 
 type Player struct {
+	name       string
+	socketPath string
 	cmd        *exec.Cmd
 	conn       *mpvipc.Connection
 	streamC    chan string
-	socketPath string
 	lowLatency bool
 }
 
 const DefaultGPU string = "auto"
 
-func NewPlayerFactory(flags []string, gpu string, lowLatency bool) xwm.PlayerFactory {
+func NewPlayerFactory(name string, flags []string, gpu string, lowLatency bool) xwm.PlayerFactory {
 	return func(wid xproto.Window) (xwm.Player, error) {
 		socketPath := fmt.Sprintf("/tmp/x-ipc-viewer-mpv-%s", uuid.New())
 
@@ -37,22 +38,27 @@ func NewPlayerFactory(flags []string, gpu string, lowLatency bool) xwm.PlayerFac
 			fmt.Sprintf("--wid=%d", wid),                      // bind to x window
 			"--input-vo-keyboard=no",                          // passthrough keyboard input to sub x window
 			"--no-input-cursor",                               // passthrough mouse input to sub x window
-			"--no-osc",                                        // don't render on-screen-ui
+			"--no-osc",                                        // don't render on screen ui
 			"--force-window",                                  // render empty video when no file-loaded
 			"--idle",                                          // keep window open when no file-loaded
 			"--loop-file=inf",                                 // loop video
+			"--quiet",                                         // disable real time track position in stdout
 		}
 
+		// Hardware decoding
 		args = append(args, fmt.Sprintf("--hwdec=%s", gpu))
 
+		// Low latency
 		if lowLatency {
 			args = append(args, "--profile=low-latency", "--no-cache")
 		}
 
+		// Flags
 		args = append(args, flags...)
 
 		// Start mpv
 		cmd := exec.Command("mpv", args...)
+		cmd.Stdout = NewPrintWriter(name)
 		if err := cmd.Start(); err != nil {
 			return nil, err
 		}
@@ -79,10 +85,11 @@ func NewPlayerFactory(flags []string, gpu string, lowLatency bool) xwm.PlayerFac
 		}
 
 		p := Player{
+			name:       name,
+			socketPath: socketPath,
 			cmd:        cmd,
 			conn:       conn,
 			streamC:    make(chan string, 1),
-			socketPath: socketPath,
 			lowLatency: lowLatency,
 		}
 

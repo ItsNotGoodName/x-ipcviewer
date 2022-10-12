@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net/url"
+	"strconv"
 
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
@@ -32,6 +34,7 @@ type Player struct {
 }
 
 type Window struct {
+	Name       string
 	Main       string
 	Sub        string
 	LowLatency bool
@@ -48,6 +51,16 @@ func Parse(cfg *Config) error {
 	// Parse Windows
 	for i := range cfg.Windows {
 		cfg.Windows[i].Flags = append(cfg.Player.Flags, cfg.Windows[i].Flags...)
+		if cfg.Windows[i].Name == "" {
+			cfg.Windows[i].Name = strconv.Itoa(i)
+
+			name, err := parseHostname(cfg.Windows[i].Main)
+			if err != nil {
+				continue
+			}
+
+			cfg.Windows[i].Name = name
+		}
 	}
 
 	// Parse LayoutManualWindows
@@ -65,4 +78,13 @@ func Parse(cfg *Config) error {
 	}
 
 	return nil
+}
+
+func parseHostname(maybeUrl string) (string, error) {
+	u, err := url.Parse(maybeUrl)
+	if err != nil {
+		return "", err
+	}
+
+	return u.Hostname(), nil
 }

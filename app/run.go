@@ -86,7 +86,7 @@ func createWindows(cfg *config.Config, x *xgb.Conn, root xproto.Window, layout m
 			}
 
 			// Crate player factory
-			pf := mpv.NewPlayerFactory(cfg.Windows[i].Flags, cfg.Player.GPU, cfg.Windows[i].LowLatency)
+			pf := mpv.NewPlayerFactory(cfg.Windows[i].Name, cfg.Windows[i].Flags, cfg.Player.GPU, cfg.Windows[i].LowLatency)
 
 			// Create player
 			p, err := pf(w)

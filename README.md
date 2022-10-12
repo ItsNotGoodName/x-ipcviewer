@@ -30,7 +30,7 @@ Keys are NOT case sensitive.
 # Keep streams playing when they are not in view.
 Background: false
 
-# Layout for windows, [auto, manual]
+# Layout for windows. [auto, manual]
 Layout: auto
 
 # Manual layout for windows, 'Layout' must be 'manual'.
@@ -61,7 +61,8 @@ Windows:
   - Main: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0 # Main stream used in fullscreen and/or normal view.
     Sub: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=1 # Sub stream used in normal view. (optional)
     LowLatency: true # Enable low-latency profile and disable cache.
-  - Main: /foo.mp4
+  - Name: Foo video # Name for logging purposes.
+    Main: /foo.mp4
     Flags:
       - --no-keepaspect # Stretch.
 ```
