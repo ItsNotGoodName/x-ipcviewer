@@ -5,22 +5,22 @@ import (
 	"strings"
 )
 
-type PrintWriter struct {
+type LogWriter struct {
 	name string
 }
 
-func NewPrintWriter(name string) *PrintWriter {
-	return &PrintWriter{
+func NewLogWriter(name string) *LogWriter {
+	return &LogWriter{
 		name: name,
 	}
 }
 
-func (pw *PrintWriter) Write(p []byte) (n int, err error) {
+func (lw *LogWriter) Write(p []byte) (n int, err error) {
 	for _, s := range strings.Split(string(p), "\n") {
 		if s == "" {
 			continue
 		}
-		log.Printf("mpv: %s: %s", pw.name, s)
+		log.Printf("mpv: %s: %s", lw.name, s)
 	}
 	return len(p), nil
 }

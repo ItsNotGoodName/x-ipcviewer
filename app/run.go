@@ -2,10 +2,9 @@ package app
 
 import (
 	"math"
-	"os"
-	"os/signal"
 	"sync"
 
+	"github.com/ItsNotGoodName/x-ipc-viewer/closer"
 	"github.com/ItsNotGoodName/x-ipc-viewer/config"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
 	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
@@ -21,14 +20,10 @@ func Run(cfg *config.Config) error {
 		return err
 	}
 	defer x.Close()
-
-	// Signal
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		<-c
+	closer.Add(func() error {
 		x.Close()
-	}()
+		return nil
+	})
 
 	// Cursor
 	cursor, err := xcursor.CreateCursor(x, xcursor.LeftPtr)
@@ -69,7 +64,6 @@ func Run(cfg *config.Config) error {
 func createWindows(cfg *config.Config, x *xgb.Conn, root xproto.Window, layout mosaic.Layout) ([]xwm.Window, error) {
 	count := int(math.Min(float64(layout.Count()), float64(len(cfg.Windows))))
 
-	players := make([]xwm.Player, count)
 	windows := make([]xwm.Window, count)
 	wg := sync.WaitGroup{}
 	errC := make(chan error, count)
@@ -92,10 +86,10 @@ func createWindows(cfg *config.Config, x *xgb.Conn, root xproto.Window, layout m
 			p, err := pf(w)
 			if err != nil {
 				errC <- err
+				p.Release()
 				return
 			}
 			p = xwm.NewPlayerCache(p)
-			players[i] = p
 
 			// Create window
 			windows[i] = xwm.NewWindow(w, p, cfg.Windows[i].Main, cfg.Windows[i].Sub, cfg.Background)
@@ -104,11 +98,6 @@ func createWindows(cfg *config.Config, x *xgb.Conn, root xproto.Window, layout m
 	wg.Wait()
 	select {
 	case err := <-errC:
-		for _, p := range players {
-			if p != nil {
-				p.Release()
-			}
-		}
 		return nil, err
 	default:
 		return windows, nil

@@ -3,10 +3,10 @@ package mpv
 import (
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 
 	"github.com/ItsNotGoodName/mpvipc"
+	"github.com/ItsNotGoodName/x-ipc-viewer/closer"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
 	"github.com/avast/retry-go/v3"
 	"github.com/google/uuid"
@@ -20,11 +20,10 @@ const (
 
 type Player struct {
 	name       string
-	socketPath string
-	cmd        *exec.Cmd
 	conn       *mpvipc.Connection
 	streamC    chan string
 	lowLatency bool
+	closers    []int
 }
 
 const DefaultGPU string = "auto"
@@ -56,43 +55,57 @@ func NewPlayerFactory(name string, flags []string, gpu string, lowLatency bool) 
 		// Flags
 		args = append(args, flags...)
 
-		// Start mpv
+		var closers []int
+
+		// Mpv cmd
 		cmd := exec.Command("mpv", args...)
-		cmd.Stdout = NewPrintWriter(name)
+		cmd.Stdout = NewLogWriter(name)
+
+		closers = append(closers, closer.Add(cmdCloser(cmd)))
+
+		// Start mpv
 		if err := cmd.Start(); err != nil {
+			closer.Close(closers...)
 			return nil, err
 		}
 
-		// Open connection
+		// Open mpv connection
 		conn := mpvipc.NewConnection(socketPath)
+
+		closers = append(closers, closer.Add(connectionCloser(conn, socketPath)))
+
+		// Listen for mpv events
 		var eventC <-chan *mpvipc.Event
 		if err := retry.Do(func() error {
 			var err error
 			eventC, err = conn.Open(50)
 			return err
 		}, retry.Attempts(50), retry.DelayType(retry.FixedDelay)); err != nil {
+			closer.Close(closers...)
 			return nil, err
 		}
 
-		// Setup event observers
+		// Setup mpv event observers
 		_, err := conn.Call("observe_property", event_demuxer_cache_idle, "demuxer-cache-idle")
 		if err != nil {
+			closer.Close(closers...)
 			return nil, err
 		}
 		_, err = conn.Call("observe_property", event_demuxer_cache_time, "demuxer-cache-time")
 		if err != nil {
+			closer.Close(closers...)
 			return nil, err
 		}
 
 		p := Player{
 			name:       name,
-			socketPath: socketPath,
-			cmd:        cmd,
 			conn:       conn,
 			streamC:    make(chan string, 1),
 			lowLatency: lowLatency,
+			closers:    closers,
 		}
 
+		// Watch mpv events
 		go p.watch(eventC)
 
 		return p, nil
@@ -131,19 +144,7 @@ func (p Player) Stop() error {
 }
 
 func (p Player) Release() {
-	if p.conn.IsClosed() {
-		return
-	}
-
-	if err := p.conn.Close(); err != nil {
-		log.Println("mpv.Player.Release:", err)
-	}
-
-	if err := p.cmd.Process.Kill(); err != nil {
-		log.Println("mpv.Player.Release:", err)
-	}
-
-	if err := os.Remove(p.socketPath); err != nil {
+	if err := closer.Close(p.closers...); err != nil {
 		log.Println("mpv.Player.Release:", err)
 	}
 }
