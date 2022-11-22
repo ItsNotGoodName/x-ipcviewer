@@ -1,13 +1,18 @@
 # x-ipc-viewer
 
+[![GitHub](https://img.shields.io/github/license/itsnotgoodname/x-ipc-viewer)](./LICENSE)
+[![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/itsnotgoodname/x-ipc-viewer)](https://github.com/ItsNotGoodName/x-ipc-viewer/tags)
+[![GitHub last commit](https://img.shields.io/github/last-commit/itsnotgoodname/x-ipc-viewer)](https://github.com/ItsNotGoodName/x-ipc-viewer)
+[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/itsnotgoodname/x-ipc-viewer)](./go.mod)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ItsNotGoodName/x-ipc-viewer)](https://goreportcard.com/report/github.com/ItsNotGoodName/x-ipc-viewer)
+
 IP camera viewer for X11.
 
 # Features
 
-- [mpv](https://mpv.io) with hardware decoding and low latency profile.
+- [mpv](https://mpv.io) as the video player.
 - Main and sub stream.
-- Streams restart when they are out of sync.
-- Window layouts.
+- Layout view.
   - Auto grid.
   - Manual placement.
 - Fullscreen view.
@@ -18,9 +23,9 @@ IP camera viewer for X11.
 | --- | -------------- | ---------------------- |
 | q   |                | Quit                   |
 | 1-9 | 2 x Left Click | Toggle Fullscreen View |
-| 0   |                | Activate Normal View   |
+| 0   |                | Activate Layout View   |
 
-# Config
+# Configuration
 
 Located at `~/.x-ipc-viewer.yml`.
 
@@ -60,11 +65,12 @@ Player:
 Windows:
   - Main: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0 # Main stream used in fullscreen and/or normal view.
     Sub: rtsp://admin:password@192.168.1.108:554/cam/realmonitor?channel=1&subtype=1 # Sub stream used in normal view. (optional)
-    LowLatency: true # Enable low-latency profile and disable cache.
+    LowLatency: true # Enable low-latency profile and disable cache. Should be used for streams from IP cameras.
   - Name: Foo video # Name for logging purposes.
-    Main: /foo.mp4
-    Flags:
-      - --no-keepaspect # Stretch.
+    Main: /tmp/foo.mp4
+    Flags: # Extra mpv flags.
+      - --no-keepaspect # Stretch window.
+      - --glsl-shader=/tmp/nonlinear_stretch.glsl # https://gist.github.com/sarahzrf/c9909aee70e3656895820f20ac395956
 ```
 
 # Setup
@@ -73,13 +79,15 @@ This guide is for headless Debian 11 systems. Restart after finishing the guide.
 
 ## Installation
 
+Run the following command.
+
 ```
 sudo apt install xserver-xorg xinit mpv
 ```
 
-Create the directory `~/bin/`.
+Create the directory `~/.local/bin/`.
 
-[Download x-ipc-viewer](https://github.com/ItsNotGoodName/x-ipc-viewer/releases) and place it in `~/bin/`.
+[Download](https://github.com/ItsNotGoodName/x-ipc-viewer/releases/latest) the binary and place it in `~/.local/bin/`.
 
 ## Start On Login
 
@@ -113,11 +121,15 @@ ExecStart=-/sbin/agetty -o '-p -f -- \\u' --noclear --autologin username %I $TER
 
 ## Enable Audio (Optional)
 
+Run the following command.
+
 ```shell
 sudo apt install pulseaudio
 ```
 
 ## Hide Mouse When Not Moving (Optional)
+
+Run the following command.
 
 ```shell
 sudo apt install unclutter
@@ -134,7 +146,8 @@ unclutter &
 - ~~Add more layouts.~~
 - ~~Add configurable [mpv](https://mpv.io) flags for each window.~~
 - Add left click to focus window.
+- Mute window with unfocus and focus events.
+- Zooming.
 - Add multi-monitor support.
 - Share audio between windows.
 - Make switching between main and sub stream more seamless.
-- Zooming.
