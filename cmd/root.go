@@ -42,6 +42,7 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 		if err := app.Run(&cfg); err != nil {
 			log.Fatalln(err)
 		}
@@ -92,7 +93,6 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 
 		if err = config.Parse(&cfg); err != nil {
 			log.Fatalf("unable to decode into struct: %v", err)
