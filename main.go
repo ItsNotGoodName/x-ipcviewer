@@ -23,9 +23,9 @@ package main
 
 import "github.com/ItsNotGoodName/x-ipc-viewer/cmd"
 
-var Version string = "dev"
+var version string = "dev"
 
 func main() {
-	cmd.Version = Version
+	cmd.Version = version
 	cmd.Execute()
 }

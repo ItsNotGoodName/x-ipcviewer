@@ -95,7 +95,6 @@ func createWindows(cfg *config.Config, x *xgb.Conn, root xproto.Window, layout m
 			p, err := pf(w)
 			if err != nil {
 				errC <- err
-				p.Release()
 				return
 			}
 			p = xwm.NewPlayerCache(p)
