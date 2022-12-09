@@ -10,8 +10,10 @@ import (
 	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xcursor"
 	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
+	"github.com/fsnotify/fsnotify"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
+	"github.com/spf13/viper"
 )
 
 func Run(cfg *config.Config) error {
@@ -24,6 +26,13 @@ func Run(cfg *config.Config) error {
 		x.Close()
 		return nil
 	})
+
+	if cfg.ConfigWatchExit {
+		viper.WatchConfig()
+		viper.OnConfigChange(func(in fsnotify.Event) {
+			x.Close()
+		})
+	}
 
 	// Cursor
 	cursor, err := xcursor.CreateCursor(x, xcursor.LeftPtr)

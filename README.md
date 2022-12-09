@@ -97,7 +97,7 @@ Create file at `~/.xinitrc` with the following content.
 #!/bin/sh
 [ -f /etc/xprofile ] && . /etc/xprofile
 [ -f ~/.xprofile ] && . ~/.xprofile
-exec x-ipc-viewer
+exec x-ipc-viewer --config-watch-exit
 ```
 
 Add the following content to the end of `~/.profile`.

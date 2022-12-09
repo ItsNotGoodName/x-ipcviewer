@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	Background          bool
+	ConfigWatchExit     bool
 	Layout              Layout
 	LayoutManualWindows []mosaic.LayoutManualWindow `mapstructure:"-"`
 	Player              Player

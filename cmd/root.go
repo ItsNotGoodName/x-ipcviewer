@@ -67,6 +67,9 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.x-ipc-viewer.yaml)")
 
+	rootCmd.Flags().Bool("config-watch-exit", false, "exit when config changes")
+	viper.BindPFlag("ConfigWatchExit", rootCmd.Flags().Lookup("config-watch-exit"))
+
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")

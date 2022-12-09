@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/ItsNotGoodName/mpvipc v0.0.0-20221010000610-75dcc396540e
 	github.com/avast/retry-go/v3 v3.1.1
+	github.com/fsnotify/fsnotify v1.5.4
 	github.com/google/uuid v1.3.0
 	github.com/jezek/xgb v1.0.1
 	github.com/spf13/cobra v1.5.0
@@ -12,7 +13,6 @@ require (
 )
 
 require (
-	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
