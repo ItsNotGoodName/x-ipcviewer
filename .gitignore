@@ -32,3 +32,5 @@ go.work
 
 dist/
 __debug_bin
+.x-ipc-viewer.yml
+.x-ipc-viewer.yaml
