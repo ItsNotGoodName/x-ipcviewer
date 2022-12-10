@@ -25,7 +25,7 @@ func (l LayoutManual) update(wins []Window, w, h uint16) {
 	for i := range wins {
 		wins[i].X = uint16(l.windows[i].X * float32(w))
 		wins[i].Y = uint16(l.windows[i].Y * float32(h))
-		wins[i].W = uint16(l.windows[i].W * float32(w))
-		wins[i].H = uint16(l.windows[i].H * float32(h))
+		wins[i].W = uint16((l.windows[i].W+l.windows[i].X)*float32(w)) - wins[i].X
+		wins[i].H = uint16((l.windows[i].H+l.windows[i].Y)*float32(h)) - wins[i].Y
 	}
 }
