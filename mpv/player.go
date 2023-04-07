@@ -80,7 +80,7 @@ func NewPlayerFactory(name string, flags []string, gpu string, lowLatency bool) 
 			var err error
 			eventC, err = conn.Open(50)
 			return err
-		}, retry.Attempts(50), retry.DelayType(retry.FixedDelay)); err != nil {
+		}, retry.Attempts(2000), retry.DelayType(retry.FixedDelay)); err != nil {
 			closer.Close(closers...)
 			return nil, err
 		}
