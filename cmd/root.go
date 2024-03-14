@@ -65,7 +65,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.x-ipc-viewer.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.x-ipcviewer.yaml)")
 
 	rootCmd.Flags().Bool("config-watch-exit", false, "exit when config changes")
 	viper.BindPFlag("ConfigWatchExit", rootCmd.Flags().Lookup("config-watch-exit"))
@@ -85,11 +85,11 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".x-ipc-viewer" (without extension).
+		// Search config in home directory with name ".x-ipcviewer" (without extension).
 		viper.AddConfigPath(".")
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".x-ipc-viewer")
+		viper.SetConfigName(".x-ipcviewer")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

@@ -26,7 +26,7 @@ IP camera viewer for X11.
 
 # Configuration
 
-Located at `~/.x-ipc-viewer.yml`.
+Located at `~/.x-ipcviewer.yml`.
 
 Keys are NOT case sensitive.
 
