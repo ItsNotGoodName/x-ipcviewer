@@ -3,7 +3,7 @@ package xwm
 import (
 	"log"
 
-	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
+	"github.com/ItsNotGoodName/x-ipcviewer/mosaic"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
 )

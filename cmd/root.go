@@ -26,8 +26,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/ItsNotGoodName/x-ipc-viewer/app"
-	"github.com/ItsNotGoodName/x-ipc-viewer/config"
+	"github.com/ItsNotGoodName/x-ipcviewer/app"
+	"github.com/ItsNotGoodName/x-ipcviewer/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,7 +37,7 @@ var cfg config.Config
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "x-ipc-viewer",
+	Use:   "x-ipcviewer",
 	Short: "IP camera viewer for X11.",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:

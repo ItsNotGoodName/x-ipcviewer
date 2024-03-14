@@ -6,8 +6,8 @@ import (
 	"os/exec"
 
 	"github.com/ItsNotGoodName/mpvipc"
-	"github.com/ItsNotGoodName/x-ipc-viewer/closer"
-	"github.com/ItsNotGoodName/x-ipc-viewer/xwm"
+	"github.com/ItsNotGoodName/x-ipcviewer/closer"
+	"github.com/ItsNotGoodName/x-ipcviewer/xwm"
 	"github.com/avast/retry-go/v3"
 	"github.com/google/uuid"
 	"github.com/jezek/xgb/xproto"
@@ -30,7 +30,7 @@ const DefaultGPU string = "auto"
 
 func NewPlayerFactory(name string, flags []string, gpu string, lowLatency bool) xwm.PlayerFactory {
 	return func(wid xproto.Window) (xwm.Player, error) {
-		socketPath := fmt.Sprintf("/tmp/x-ipc-viewer-mpv-%s", uuid.New())
+		socketPath := fmt.Sprintf("/tmp/x-ipcviewer-mpv-%s", uuid.New())
 
 		args := []string{
 			fmt.Sprintf("--input-unix-socket=%s", socketPath), // mpvipc

@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
-	"github.com/ItsNotGoodName/x-ipc-viewer/mpv"
+	"github.com/ItsNotGoodName/x-ipcviewer/mosaic"
+	"github.com/ItsNotGoodName/x-ipcviewer/mpv"
 	"github.com/spf13/viper"
 )
 

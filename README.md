@@ -1,10 +1,9 @@
-# x-ipc-viewer
+# X-IPCViewer
 
-[![GitHub](https://img.shields.io/github/license/itsnotgoodname/x-ipc-viewer)](./LICENSE)
-[![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/itsnotgoodname/x-ipc-viewer)](https://github.com/ItsNotGoodName/x-ipc-viewer/tags)
-[![GitHub last commit](https://img.shields.io/github/last-commit/itsnotgoodname/x-ipc-viewer)](https://github.com/ItsNotGoodName/x-ipc-viewer)
-[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/itsnotgoodname/x-ipc-viewer)](./go.mod)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ItsNotGoodName/x-ipc-viewer)](https://goreportcard.com/report/github.com/ItsNotGoodName/x-ipc-viewer)
+[![GitHub](https://img.shields.io/github/license/itsnotgoodname/x-ipcviewer)](./LICENSE)
+[![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/itsnotgoodname/x-ipcviewer)](https://github.com/ItsNotGoodName/x-ipcviewer/tags)
+[![GitHub last commit](https://img.shields.io/github/last-commit/itsnotgoodname/x-ipcviewer)](https://github.com/ItsNotGoodName/x-ipcviewer)
+[![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/itsnotgoodname/x-ipcviewer)](./go.mod)
 
 IP camera viewer for X11.
 
@@ -87,7 +86,7 @@ sudo apt install xserver-xorg xinit mpv
 
 Create the directory `~/.local/bin/`.
 
-[Download](https://github.com/ItsNotGoodName/x-ipc-viewer/releases/latest) the binary and place it in `~/.local/bin/`.
+[Download](https://github.com/ItsNotGoodName/x-ipcviewer/releases/latest) the binary and place it in `~/.local/bin/`.
 
 ## Start On Login
 
@@ -97,7 +96,7 @@ Create file at `~/.xinitrc` with the following content.
 #!/bin/sh
 [ -f /etc/xprofile ] && . /etc/xprofile
 [ -f ~/.xprofile ] && . ~/.xprofile
-exec x-ipc-viewer --config-watch-exit
+exec x-ipcviewer --config-watch-exit
 ```
 
 Add the following content to the end of `~/.profile`.

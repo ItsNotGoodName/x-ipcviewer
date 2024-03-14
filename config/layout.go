@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ItsNotGoodName/x-ipc-viewer/mosaic"
+	"github.com/ItsNotGoodName/x-ipcviewer/mosaic"
 )
 
 type ConfigLayoutManual struct {

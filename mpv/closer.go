@@ -5,7 +5,7 @@ import (
 	"os/exec"
 
 	"github.com/ItsNotGoodName/mpvipc"
-	"github.com/ItsNotGoodName/x-ipc-viewer/closer"
+	"github.com/ItsNotGoodName/x-ipcviewer/closer"
 )
 
 func cmdCloser(cmd *exec.Cmd) closer.Closer {

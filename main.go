@@ -21,7 +21,7 @@ THE SOFTWARE.
 */
 package main
 
-import "github.com/ItsNotGoodName/x-ipc-viewer/cmd"
+import "github.com/ItsNotGoodName/x-ipcviewer/cmd"
 
 var version string = "dev"
 

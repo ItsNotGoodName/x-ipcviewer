@@ -1,4 +1,4 @@
-module github.com/ItsNotGoodName/x-ipc-viewer
+module github.com/ItsNotGoodName/x-ipcviewer
 
 go 1.19
 
