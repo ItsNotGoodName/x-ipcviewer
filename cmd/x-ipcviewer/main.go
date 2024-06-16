@@ -4,44 +4,109 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"os"
-	"os/signal"
+	"path/filepath"
 
-	"github.com/ItsNotGoodName/x-ipcviewer/xwm"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/build"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/bus"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
+	"github.com/danielgtaylor/huma/v2/humacli"
 	_ "github.com/gen2brain/go-mpv"
 	"github.com/jezek/xgb"
-	"github.com/jezek/xgb/xproto"
+	"github.com/joho/godotenv"
+	"github.com/phsym/console-slog"
 )
 
-func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
-	if err := xwm.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
-		log.Fatalln(err)
-	}
+type Options struct {
+	Debug  bool   `doc:"enable debug"`
+	Host   string `doc:"host to listen on"`
+	Port   int    `doc:"port to listen on" default:"8080"`
+	Config string `doc:"config file" default:".x-ipcviewer.yaml"`
 }
 
-func CreateXSubWindow(x *xgb.Conn, root xproto.Window) (xproto.Window, error) {
-	// Generate X window id
-	wid, err := xproto.NewWindowId(x)
-	if err != nil {
-		return 0, err
-	}
+func main() {
+	godotenv.Load()
 
-	// Create X window in root
-	if err := xproto.CreateWindowChecked(x, xproto.WindowClassCopyFromParent,
-		wid, root,
-		0, 0, 1536, 900, 0,
-		xproto.WindowClassInputOutput, xproto.WindowClassCopyFromParent, 0, []uint32{}).Check(); err != nil {
-		return 0, err
-	}
+	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
+		if options.Debug {
+			InitLogger(slog.LevelDebug)
+		} else {
+			InitLogger(slog.LevelInfo)
+		}
 
-	// Show X window
-	if err = xproto.MapWindowChecked(x, wid).Check(); err != nil {
-		xproto.DestroyWindow(x, wid)
-		return 0, err
-	}
+		OnServe(hooks, func(ctx context.Context) error {
+			bus.SetContext(ctx)
 
-	return wid, nil
+			configFilePath, err := filepath.Abs(options.Config)
+			if err != nil {
+				return err
+			}
+
+			provider, err := config.NewProvider(configFilePath)
+			if err != nil {
+				return err
+			}
+
+			if err := xwm.NormalizeConfig(provider); err != nil {
+				return err
+			}
+
+			conn, err := xgb.NewConn()
+			if err != nil {
+				return err
+			}
+			defer conn.Close()
+
+			state, err := xwm.SetupState(conn, provider)
+			if err != nil {
+				return err
+			}
+
+			eventC := make(chan any)
+			go xwm.ReceiveEvents(ctx, conn, eventC)
+
+			return xwm.HandleEvents(ctx, conn, state, eventC)
+		})
+	})
+
+	cli.Root().Version = build.Current.Version
+
+	cli.Run()
+}
+
+func InitLogger(level slog.Level) {
+	slog.SetDefault(slog.New(console.NewHandler(os.Stderr, &console.HandlerOptions{
+		Level: level,
+	})))
+}
+
+func OnServe(hooks humacli.Hooks, serveFn func(ctx context.Context) error) {
+	stopC := make(chan struct{})
+	hooks.OnStart(func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		errC := make(chan error, 1)
+
+		go func() { errC <- serveFn(ctx) }()
+
+		select {
+		case <-stopC:
+			cancel()
+		case err := <-errC:
+			if err != nil && !errors.Is(err, context.Canceled) {
+				log.Fatal(err)
+			}
+			return
+		}
+
+		<-errC
+		<-stopC
+	})
+	hooks.OnStop(func() {
+		stopC <- struct{}{}
+		stopC <- struct{}{}
+	})
 }

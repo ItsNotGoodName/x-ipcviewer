@@ -7,7 +7,7 @@ import (
 	"github.com/jezek/xgb/xproto"
 )
 
-func NewMPV(wid xproto.Window) *mpv.Mpv {
+func NewMpv(wid xproto.Window) *mpv.Mpv {
 	m := mpv.New()
 	m.SetOptionString("wid", strconv.Itoa(int(wid)))
 	return m
