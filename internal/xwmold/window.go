@@ -1,4 +1,4 @@
-package xwm
+package xwmold
 
 import (
 	"context"

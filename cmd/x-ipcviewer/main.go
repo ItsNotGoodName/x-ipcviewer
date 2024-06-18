@@ -11,7 +11,7 @@ import (
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/build"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/bus"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
-	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwmold"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	_ "github.com/gen2brain/go-mpv"
 	"github.com/jezek/xgb"
@@ -49,7 +49,7 @@ func main() {
 				return err
 			}
 
-			if err := xwm.NormalizeConfig(provider); err != nil {
+			if err := xwmold.NormalizeConfig(provider); err != nil {
 				return err
 			}
 
@@ -59,15 +59,15 @@ func main() {
 			}
 			defer conn.Close()
 
-			state, err := xwm.SetupState(conn, provider)
+			state, err := xwmold.SetupState(conn, provider)
 			if err != nil {
 				return err
 			}
 
 			eventC := make(chan any)
-			go xwm.ReceiveEvents(ctx, conn, eventC)
+			go xwmold.ReceiveEvents(ctx, conn, eventC)
 
-			return xwm.HandleEvents(ctx, conn, state, eventC)
+			return xwmold.Run(ctx, conn, state, eventC)
 		})
 	})
 
