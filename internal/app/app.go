@@ -1,8 +1,29 @@
-package xwmold
+package app
 
 import (
 	"math"
+
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
+	"github.com/google/uuid"
 )
+
+func NormalizeConfig(provider config.Provider) error {
+	return provider.UpdateConfig(func(cfg config.Config) (config.Config, error) {
+		for i := range cfg.Streams {
+			if cfg.Streams[i].UUID == "" {
+				cfg.Streams[i].UUID = uuid.NewString()
+			}
+		}
+
+		for i := range cfg.Views {
+			if cfg.Views[i].UUID == "" {
+				cfg.Views[i].UUID = uuid.NewString()
+			}
+		}
+
+		return cfg, nil
+	})
+}
 
 type LayoutGrid struct {
 	width      uint16

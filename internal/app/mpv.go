@@ -1,4 +1,4 @@
-package xwmold
+package app
 
 import (
 	"strconv"

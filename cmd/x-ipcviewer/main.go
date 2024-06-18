@@ -8,13 +8,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/app"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/build"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/bus"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
-	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwmold"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
+	"github.com/ItsNotGoodName/x-ipcviewer/pkg/sutureext"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	_ "github.com/gen2brain/go-mpv"
-	"github.com/jezek/xgb"
 	"github.com/joho/godotenv"
 	"github.com/phsym/console-slog"
 )
@@ -39,6 +40,8 @@ func main() {
 		OnServe(hooks, func(ctx context.Context) error {
 			bus.SetContext(ctx)
 
+			root := sutureext.NewSimple("root")
+
 			configFilePath, err := filepath.Abs(options.Config)
 			if err != nil {
 				return err
@@ -49,25 +52,13 @@ func main() {
 				return err
 			}
 
-			if err := xwmold.NormalizeConfig(provider); err != nil {
+			if err := app.NormalizeConfig(provider); err != nil {
 				return err
 			}
 
-			conn, err := xgb.NewConn()
-			if err != nil {
-				return err
-			}
-			defer conn.Close()
+			sutureext.Add(root, xwm.NewProgram(app.Model{}))
 
-			state, err := xwmold.SetupState(conn, provider)
-			if err != nil {
-				return err
-			}
-
-			eventC := make(chan any)
-			go xwmold.ReceiveEvents(ctx, conn, eventC)
-
-			return xwmold.Run(ctx, conn, state, eventC)
+			return root.Serve(ctx)
 		})
 	})
 
