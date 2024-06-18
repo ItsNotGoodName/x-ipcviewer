@@ -31,7 +31,6 @@ type LayoutGrid struct {
 	paneWidth  uint16
 	paneHeight uint16
 	columns    int
-	rows       int
 }
 
 func NewLayoutGrid(width, height uint16, count int) LayoutGrid {
@@ -51,16 +50,17 @@ func NewLayoutGrid(width, height uint16, count int) LayoutGrid {
 		paneWidth:  paneWidth,
 		paneHeight: paneHeight,
 		columns:    columns,
-		rows:       rows,
 	}
 }
 
 func (l LayoutGrid) Pane(index int) (x int16, y int16, w uint16, h uint16) {
-	row, col := math.Floor(float64(index/l.rows)), index%l.columns
+	row := math.Floor(float64(index / l.columns))
+	col := index % l.columns
 
 	x = int16(l.paneWidth * uint16(col))
 	y = int16(l.paneHeight * uint16(row))
 	w = l.paneWidth
 	h = l.paneHeight
+
 	return
 }

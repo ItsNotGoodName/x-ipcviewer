@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
+	"github.com/google/uuid"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
 )
@@ -14,11 +15,10 @@ import (
 func (m Model) Init(conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 	window, err := xwm.CreateWindow(conn)
 	if err != nil {
-		return m, xwm.Quit
+		panic(err)
 	}
 
-	m.FullscreenUUID = "f"
-	m.View = "auto"
+	m.View = "grid"
 	m.WID = window.WID
 	m.Width = window.Width
 	m.Height = window.Height
@@ -29,7 +29,7 @@ func (m Model) Init(conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 func (m Model) Update(conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
 	switch ev := msg.(type) {
 	case xproto.ConfigureNotifyEvent:
-		slog.Debug("ConfigureNotifyEvent:", "event", ev)
+		slog.Debug("ConfigureNotifyEvent:", "event", ev.String())
 
 		if ev.Window == m.WID {
 			m.Width = ev.Width
@@ -38,11 +38,34 @@ func (m Model) Update(conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
 
 		return m, nil
 	case xproto.ButtonPressEvent:
-		slog.Debug("ButtonPressEvent", "detail", ev.Detail)
+		slog.Debug("ButtonPressEvent", "detail", ev.String())
+
+		switch ev.Detail {
+		case xproto.ButtonIndex1:
+			idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return ev.Child == p.WID })
+			if idx == -1 {
+				return m, nil
+			}
+
+			m.FullscreenUUID = m.Panes[idx].UUID
+
+			return m, func(ctx context.Context) xwm.Msg { return m.Panes[idx].Window.Send(ctx, "") }
+		case xproto.ButtonIndex3:
+		}
+
+		if ev.Detail == xproto.ButtonIndex1 {
+		} else if ev.Detail == xproto.ButtonIndex3 {
+			idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return p.UUID == m.FullscreenUUID })
+			if idx == -1 {
+				return m, nil
+			}
+
+			m.FullscreenUUID = ""
+		}
 
 		return m, nil
 	case xproto.KeyPressEvent:
-		slog.Debug("KeyPressEvent", "detail", ev.Detail)
+		slog.Debug("KeyPressEvent", "detail", ev.String())
 
 		if ev.Detail == 24 {
 			slog.Debug("exit: quit key pressed")
@@ -50,25 +73,24 @@ func (m Model) Update(conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
 		}
 
 		if ev.Detail == 65 {
-			sub, err := xwm.CreateSubWindow(conn, m.WID, 0, 0, 1, 1)
+			wid, err := xwm.CreateSubWindow(conn, m.WID)
 			if err != nil {
-				fmt.Println(err)
-				return m, nil
+				return m, xwm.Error(err)
 			}
 
-			window, err := NewWindow(sub.WID)
+			window, err := NewWindow(wid)
 			if err != nil {
-				return m, nil
+				xwm.DestroySubWindow(conn, wid)
+				return m, xwm.Error(err)
 			}
-
-			go window.Serve(context.Background())
 
 			m.Panes = append(m.Panes, ModelPane{
-				UUID:   "",
+				UUID:   uuid.NewString(),
+				WID:    wid,
 				Window: window,
 			})
 
-			return m, nil
+			return m, func(ctx context.Context) xwm.Msg { return window.Serve(ctx) }
 		}
 
 		return m, nil
@@ -113,6 +135,7 @@ type Model struct {
 
 type ModelPane struct {
 	UUID   string
+	WID    xproto.Window
 	Window Window
 }
 
@@ -127,7 +150,7 @@ func (m Model) Render(conn *xgb.Conn) error {
 	idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return p.UUID == m.FullscreenUUID })
 
 	if idx == -1 {
-		if m.View != "auto" {
+		if m.View != "grid" {
 			return fmt.Errorf("view %s not supported", m.View)
 		}
 
@@ -135,7 +158,7 @@ func (m Model) Render(conn *xgb.Conn) error {
 		for i := range m.Panes {
 			x, y, w, h := layout.Pane(i)
 
-			err := xproto.ConfigureWindowChecked(conn, m.Panes[i].Window.wid,
+			err := xproto.ConfigureWindowChecked(conn, m.Panes[i].WID,
 				xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight,
 				[]uint32{uint32(x), uint32(y), uint32(w), uint32(h)}).
 				Check()
@@ -147,13 +170,13 @@ func (m Model) Render(conn *xgb.Conn) error {
 		return nil
 	} else {
 		x, y, w, h := int16(0), int16(0), m.Width, m.Height
-		fmt.Println(x, y, w, h)
 
-		err := xproto.ConfigureWindowChecked(conn, m.Panes[idx].Window.wid,
-			xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight,
-			[]uint32{uint32(x), uint32(y), uint32(w), uint32(h)}).
+		err := xproto.ConfigureWindowChecked(conn, m.Panes[idx].WID,
+			xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight|xproto.ConfigWindowStackMode,
+			[]uint32{uint32(x), uint32(y), uint32(w), uint32(h), 0}).
 			Check()
 		if err != nil {
+			fmt.Println(err)
 			return err
 		}
 

@@ -16,13 +16,25 @@ type Model interface {
 	Render(*xgb.Conn) error
 }
 
-type Cmd func() Msg
+type Cmd func(ctx context.Context) Msg
 
-func Quit() Msg {
+func Quit(context.Context) Msg {
 	return QuitMsg{}
 }
 
 type QuitMsg struct{}
+
+type ErrorMsg struct {
+	Error error
+}
+
+func Error(e error) Cmd {
+	return func(context.Context) Msg {
+		return ErrorMsg{
+			Error: e,
+		}
+	}
+}
 
 func NewProgram(initialModel Model) Program {
 	return Program{
@@ -104,7 +116,7 @@ func (p Program) Send(ctx context.Context, msg Msg) error {
 }
 
 func (p Program) Quit(ctx context.Context) error {
-	return p.Send(ctx, Quit())
+	return p.Send(ctx, Quit(ctx))
 }
 
 func (p Program) listenEvents(ctx context.Context, conn *xgb.Conn) {
@@ -139,7 +151,7 @@ func (p Program) handleCommands(ctx context.Context, cmds chan Cmd) {
 				}
 
 				go func() {
-					msg := cmd()
+					msg := cmd(ctx)
 					p.Send(ctx, msg)
 				}()
 			}

@@ -49,30 +49,30 @@ func CreateWindow(conn *xgb.Conn) (Window, error) {
 	}, nil
 }
 
-func CreateSubWindow(conn *xgb.Conn, root xproto.Window, x, y int16, w, h uint16) (Window, error) {
-	// Generate X window id
+func CreateSubWindow(conn *xgb.Conn, root xproto.Window) (xproto.Window, error) {
+	// Generate window id
 	wid, err := xproto.NewWindowId(conn)
 	if err != nil {
-		return Window{}, err
+		return 0, err
 	}
 
-	// Create X window in root
+	// Create window in root
 	if err := xproto.CreateWindowChecked(conn, xproto.WindowClassCopyFromParent,
 		wid, root,
-		x, y, w, h, 0,
+		0, 0, 1, 1, 0,
 		xproto.WindowClassInputOutput, xproto.WindowClassCopyFromParent, 0, []uint32{}).Check(); err != nil {
-		return Window{}, err
+		return 0, err
 	}
 
-	// Show X window
+	// Show window
 	if err = xproto.MapWindowChecked(conn, wid).Check(); err != nil {
 		xproto.DestroyWindow(conn, wid)
-		return Window{}, err
+		return 0, err
 	}
 
-	return Window{
-		WID:    wid,
-		Width:  w,
-		Height: h,
-	}, err
+	return wid, err
+}
+
+func DestroySubWindow(conn *xgb.Conn, wid xproto.Window) {
+	xproto.DestroyWindow(conn, wid)
 }
