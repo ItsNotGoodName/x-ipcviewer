@@ -10,7 +10,7 @@ import (
 	"github.com/jezek/xgb/xproto"
 )
 
-func NewWindow(wid xproto.Window) (Window, error) {
+func NewWindow(ctx context.Context, wid xproto.Window) (Window, error) {
 	m := mpv.New()
 
 	_ = m.SetOption("wid", mpv.FormatInt64, int64(wid))    // bind to x window
@@ -30,13 +30,17 @@ func NewWindow(wid xproto.Window) (Window, error) {
 		return Window{}, err
 	}
 
-	return Window{
+	w := Window{
 		mpv:    m,
 		main:   os.Args[1],
 		sub:    "",
 		flags:  []string{},
 		eventC: make(chan any),
-	}, nil
+	}
+
+	go w.Serve(ctx)
+
+	return w, nil
 }
 
 type Window struct {
@@ -47,22 +51,26 @@ type Window struct {
 	eventC chan any
 }
 
-func (w Window) Serve(ctx context.Context) error {
+func (w Window) Serve(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if err := w.mpv.Command([]string{"loadfile", w.main}); err != nil {
-		return err
+		slog.Error("Failed to load file", "error", err)
 	}
 
-	eventC := w.listenEvents(ctx)
+	eventC := mpvListenEvents(ctx, w.mpv)
 
 	for {
 		select {
 		case e := <-w.eventC:
 			switch e.(type) {
 			}
-		case e := <-eventC:
+		case e, ok := <-eventC:
+			if !ok {
+				return
+			}
+
 			switch e.EventID {
 			case mpv.EventPropertyChange:
 				prop := e.Property()
@@ -84,13 +92,13 @@ func (w Window) Serve(ctx context.Context) error {
 				ef := e.EndFile()
 				fmt.Println("end:", ef.EntryID, ef.Reason)
 				if ef.Reason == mpv.EndFileEOF {
-					return nil
+					return
 				} else if ef.Reason == mpv.EndFileError {
 					fmt.Println("error:", ef.Error)
 				}
 			case mpv.EventShutdown:
 				fmt.Println("shutdown:", e.EventID)
-				return nil
+				return
 			default:
 				fmt.Println("event:", e.EventID)
 			}
@@ -107,11 +115,12 @@ func (w Window) Send(ctx context.Context, cmd any) error {
 	}
 }
 
-func (w Window) listenEvents(ctx context.Context) chan *mpv.Event {
+func mpvListenEvents(ctx context.Context, m *mpv.Mpv) chan *mpv.Event {
 	eventC := make(chan *mpv.Event)
 	go func() {
+		defer close(eventC)
 		for {
-			e := w.mpv.WaitEvent(10000)
+			e := m.WaitEvent(10000)
 			if e.Error != nil {
 				slog.Error("Failed to listen for events", "error", e.Error)
 				return

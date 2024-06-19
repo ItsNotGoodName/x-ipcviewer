@@ -12,7 +12,7 @@ import (
 	"github.com/jezek/xgb/xproto"
 )
 
-func (m Model) Init(conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
+func (m Model) Init(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 	window, err := xwm.CreateWindow(conn)
 	if err != nil {
 		panic(err)
@@ -26,7 +26,7 @@ func (m Model) Init(conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 	return m, nil
 }
 
-func (m Model) Update(conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
+func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
 	switch ev := msg.(type) {
 	case xproto.ConfigureNotifyEvent:
 		slog.Debug("ConfigureNotifyEvent:", "event", ev.String())
@@ -78,7 +78,7 @@ func (m Model) Update(conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
 				return m, xwm.Error(err)
 			}
 
-			window, err := NewWindow(wid)
+			window, err := NewWindow(ctx, wid)
 			if err != nil {
 				xwm.DestroySubWindow(conn, wid)
 				return m, xwm.Error(err)
@@ -90,7 +90,7 @@ func (m Model) Update(conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
 				Window: window,
 			})
 
-			return m, func(ctx context.Context) xwm.Msg { return window.Serve(ctx) }
+			return m, nil
 		}
 
 		return m, nil
@@ -146,7 +146,7 @@ type ModelViewManual struct {
 	H uint16
 }
 
-func (m Model) Render(conn *xgb.Conn) error {
+func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 	idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return p.UUID == m.FullscreenUUID })
 
 	if idx == -1 {

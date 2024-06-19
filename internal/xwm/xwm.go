@@ -11,9 +11,9 @@ import (
 type Msg any
 
 type Model interface {
-	Init(*xgb.Conn) (Model, Cmd)
-	Update(*xgb.Conn, Msg) (Model, Cmd)
-	Render(*xgb.Conn) error
+	Init(ctx context.Context, conn *xgb.Conn) (Model, Cmd)
+	Update(ctx context.Context, conn *xgb.Conn, msg Msg) (Model, Cmd)
+	Render(ctx context.Context, conn *xgb.Conn) error
 }
 
 type Cmd func(ctx context.Context) Msg
@@ -63,11 +63,10 @@ func (p Program) Serve(ctx context.Context) error {
 	defer conn.Close()
 
 	cmdC := make(chan Cmd)
-
-	p.listenEvents(ctx, conn)
 	p.handleCommands(ctx, cmdC)
+	listEventsDoneC := p.listenEvents(ctx, conn)
 
-	model, cmd := p.initialModel.Init(conn)
+	model, cmd := p.initialModel.Init(ctx, conn)
 	if cmd != nil {
 		select {
 		case <-ctx.Done():
@@ -81,6 +80,8 @@ func (p Program) Serve(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-listEventsDoneC:
+			return suture.ErrTerminateSupervisorTree
 		case msg := <-p.msgC:
 			// Handle
 			switch msg.(type) {
@@ -89,7 +90,7 @@ func (p Program) Serve(ctx context.Context) error {
 			}
 
 			// Update
-			model, cmd = model.Update(conn, msg)
+			model, cmd = model.Update(ctx, conn, msg)
 			if cmd != nil {
 				select {
 				case <-ctx.Done():
@@ -99,7 +100,7 @@ func (p Program) Serve(ctx context.Context) error {
 			}
 
 			// Render
-			if err := model.Render(conn); err != nil {
+			if err := model.Render(ctx, conn); err != nil {
 				slog.Error("Failed to render", "error", err)
 			}
 		}
@@ -119,8 +120,10 @@ func (p Program) Quit(ctx context.Context) error {
 	return p.Send(ctx, Quit(ctx))
 }
 
-func (p Program) listenEvents(ctx context.Context, conn *xgb.Conn) {
+func (p Program) listenEvents(ctx context.Context, conn *xgb.Conn) chan struct{} {
+	doneC := make(chan struct{})
 	go func() {
+		defer close(doneC)
 		for {
 			ev, err := conn.WaitForEvent()
 			if ev == nil && err == nil {
@@ -136,6 +139,7 @@ func (p Program) listenEvents(ctx context.Context, conn *xgb.Conn) {
 			p.Send(ctx, ev)
 		}
 	}()
+	return doneC
 }
 
 func (p Program) handleCommands(ctx context.Context, cmds chan Cmd) {
