@@ -4,14 +4,40 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"slices"
 
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
-	"github.com/google/uuid"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
 )
+
+type Model struct {
+	Provider       config.Provider
+	WID            xproto.Window
+	Width          uint16
+	Height         uint16
+	Panes          []ModelPane
+	FullscreenUUID string
+	SelectedUUID   string
+	View           string
+	ViewManual     []ModelViewManual
+}
+
+type ModelPane struct {
+	UUID   string
+	WID    xproto.Window
+	Main   string
+	Sub    string
+	Player Player
+}
+
+type ModelViewManual struct {
+	X int16
+	Y int16
+	W uint16
+	H uint16
+}
 
 func (m Model) Init(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 	window, err := xwm.CreateWindow(conn)
@@ -50,18 +76,38 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 			m.FullscreenUUID = m.Panes[idx].UUID
 
-			return m, func(ctx context.Context) xwm.Msg { return m.Panes[idx].Window.Send(ctx, "") }
-		case xproto.ButtonIndex3:
-		}
+			for _, p := range m.Panes {
+				if p.UUID == m.FullscreenUUID {
+					p.Player.Send(ctx, PlayerCommandLoadFile{
+						File: p.Main,
+					})
+				} else {
+					p.Player.Send(ctx, PlayerCommandLoadFile{
+						File: p.Sub,
+					})
+				}
+			}
 
-		if ev.Detail == xproto.ButtonIndex1 {
-		} else if ev.Detail == xproto.ButtonIndex3 {
+			return m, func(ctx context.Context) xwm.Msg { return m.Panes[idx].Player.Send(ctx, "") }
+		case xproto.ButtonIndex3:
 			idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return p.UUID == m.FullscreenUUID })
 			if idx == -1 {
 				return m, nil
 			}
 
 			m.FullscreenUUID = ""
+
+			for _, p := range m.Panes {
+				if p.UUID == m.FullscreenUUID {
+					p.Player.Send(ctx, PlayerCommandLoadFile{
+						File: p.Main,
+					})
+				} else {
+					p.Player.Send(ctx, PlayerCommandLoadFile{
+						File: p.Sub,
+					})
+				}
+			}
 		}
 
 		return m, nil
@@ -74,26 +120,43 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		}
 
 		if ev.Detail == 65 {
-			wid, err := xwm.CreateSubWindow(conn, m.WID)
+			config, err := m.Provider.GetConfig()
 			if err != nil {
 				return m, xwm.Error(err)
 			}
 
-			window, err := NewPlayer(ctx, wid)
-			if err != nil {
-				xwm.DestroySubWindow(conn, wid)
-				return m, xwm.Error(err)
+			for i, stream := range config.Streams {
+				wid, err := xwm.CreateSubWindow(conn, m.WID)
+				if err != nil {
+					return m, xwm.Error(err)
+				}
+
+				player, err := NewPlayer(ctx, wid)
+				if err != nil {
+					xwm.DestroySubWindow(conn, wid)
+					return m, xwm.Error(err)
+				}
+
+				m.Panes = append(m.Panes, ModelPane{
+					UUID:   stream.UUID,
+					WID:    wid,
+					Main:   stream.Main,
+					Sub:    stream.Sub,
+					Player: player,
+				})
+
+				player.Send(ctx, PlayerCommandLoadFile{
+					File: stream.Sub,
+				})
+
+				if i == 0 {
+					m.SelectedUUID = stream.UUID
+				} else {
+					player.Send(ctx, PlayerCommandVolume{
+						Volume: 0,
+					})
+				}
 			}
-
-			m.Panes = append(m.Panes, ModelPane{
-				UUID:   uuid.NewString(),
-				WID:    wid,
-				Window: window,
-			})
-
-			window.Send(ctx, PlayerCommandLoadFile{
-				File: os.Args[1],
-			})
 
 			return m, nil
 		}
@@ -126,29 +189,6 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		slog.Debug("unknown event", "event", ev)
 		return m, nil
 	}
-}
-
-type Model struct {
-	WID            xproto.Window
-	Width          uint16
-	Height         uint16
-	Panes          []ModelPane
-	FullscreenUUID string
-	View           string
-	ViewManual     []ModelViewManual
-}
-
-type ModelPane struct {
-	UUID   string
-	WID    xproto.Window
-	Window Player
-}
-
-type ModelViewManual struct {
-	X int16
-	Y int16
-	W uint16
-	H uint16
 }
 
 func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {

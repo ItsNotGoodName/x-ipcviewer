@@ -56,7 +56,9 @@ func main() {
 				return err
 			}
 
-			sutureext.Add(root, xwm.NewProgram(app.Model{}))
+			sutureext.Add(root, xwm.NewProgram(app.Model{
+				Provider: provider,
+			}))
 
 			return root.Serve(ctx)
 		})

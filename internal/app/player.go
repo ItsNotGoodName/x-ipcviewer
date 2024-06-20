@@ -13,18 +13,21 @@ import (
 var ErrPlayerClosed = errors.New("player closed")
 
 type (
-	PlayerCommandPlay     struct{}
-	PlayerCommandPause    struct{}
-	PlayerCommandMute     struct{}
-	PlayerCommandUnmute   struct{}
+	PlayerCommandPlay   struct{}
+	PlayerCommandPause  struct{}
+	PlayerCommandVolume struct {
+		Volume int
+	}
 	PlayerCommandLoadFile struct {
 		File string
 	}
+	PlayerCommandClose struct{}
 )
 
 func NewPlayer(ctx context.Context, wid xproto.Window) (Player, error) {
 	m := mpv.New()
 
+	// Base options
 	_ = m.SetOption("wid", mpv.FormatInt64, int64(wid))    // bind to x window
 	_ = m.SetOptionString("input-vo-keyboard", "no")       // passthrough keyboard input to sub x window
 	_ = m.SetOption("input-cursor", mpv.FormatFlag, false) // passthrough mouse input to sub x window
@@ -32,6 +35,11 @@ func NewPlayer(ctx context.Context, wid xproto.Window) (Player, error) {
 	_ = m.SetOption("force-window", mpv.FormatFlag, true)  // render empty video when no file-loaded
 	_ = m.SetOption("idle", mpv.FormatFlag, true)          // keep window open when no file-loaded
 	_ = m.SetOptionString("loop-file", "inf")              // loop video
+
+	// Custom options
+	_ = m.SetOptionString("hwdec", "auto")
+	_ = m.SetOptionString("profile", "low-latency")
+	_ = m.SetOption("cache", mpv.FormatFlag, false)
 
 	_ = m.RequestLogMessages("info")
 	// _ = m.ObserveProperty(0, "pause", mpv.FormatFlag)
@@ -69,9 +77,15 @@ func (p Player) run(ctx context.Context, m *mpv.Mpv) {
 			return
 		case e := <-p.eventC:
 			switch e := e.(type) {
+			case PlayerCommandClose:
+				return
 			case PlayerCommandLoadFile:
 				if err := m.Command([]string{"loadfile", e.File}); err != nil {
 					slog.Error("Failed to load file", "error", err)
+				}
+			case PlayerCommandVolume:
+				if err := m.SetProperty("volume", mpv.FormatInt64, int64(e.Volume)); err != nil {
+					slog.Error("Failed to mute", "error", err)
 				}
 			}
 		case e, ok := <-eventC:
