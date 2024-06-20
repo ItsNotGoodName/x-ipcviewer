@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"slices"
 
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
@@ -69,7 +70,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 		if ev.Detail == 24 {
 			slog.Debug("exit: quit key pressed")
-			return m, xwm.Quit
+			return m.Close(conn), xwm.Quit
 		}
 
 		if ev.Detail == 65 {
@@ -78,7 +79,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 				return m, xwm.Error(err)
 			}
 
-			window, err := NewWindow(ctx, wid)
+			window, err := NewPlayer(ctx, wid)
 			if err != nil {
 				xwm.DestroySubWindow(conn, wid)
 				return m, xwm.Error(err)
@@ -88,6 +89,10 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 				UUID:   uuid.NewString(),
 				WID:    wid,
 				Window: window,
+			})
+
+			window.Send(ctx, PlayerCommandLoadFile{
+				File: os.Args[1],
 			})
 
 			return m, nil
@@ -116,7 +121,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		// https://github.com/jezek/xgbutil/blob/master/_examples/graceful-window-close/main.go
 		slog.Debug("exit: destroy notify event")
 
-		return m, xwm.Quit
+		return m.Close(conn), xwm.Quit
 	default:
 		slog.Debug("unknown event", "event", ev)
 		return m, nil
@@ -136,7 +141,7 @@ type Model struct {
 type ModelPane struct {
 	UUID   string
 	WID    xproto.Window
-	Window Window
+	Window Player
 }
 
 type ModelViewManual struct {
@@ -182,4 +187,8 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 
 		return nil
 	}
+}
+
+func (m Model) Close(conn *xgb.Conn) Model {
+	return m
 }

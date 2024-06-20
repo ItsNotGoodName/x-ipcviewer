@@ -2,15 +2,27 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/gen2brain/go-mpv"
 	"github.com/jezek/xgb/xproto"
 )
 
-func NewWindow(ctx context.Context, wid xproto.Window) (Window, error) {
+var ErrPlayerClosed = errors.New("player closed")
+
+type (
+	PlayerCommandPlay     struct{}
+	PlayerCommandPause    struct{}
+	PlayerCommandMute     struct{}
+	PlayerCommandUnmute   struct{}
+	PlayerCommandLoadFile struct {
+		File string
+	}
+)
+
+func NewPlayer(ctx context.Context, wid xproto.Window) (Player, error) {
 	m := mpv.New()
 
 	_ = m.SetOption("wid", mpv.FormatInt64, int64(wid))    // bind to x window
@@ -24,47 +36,43 @@ func NewWindow(ctx context.Context, wid xproto.Window) (Window, error) {
 	_ = m.RequestLogMessages("info")
 	// _ = m.ObserveProperty(0, "pause", mpv.FormatFlag)
 
-	_ = m.SetOptionString("input-vo-keyboard", "no")
-
 	if err := m.Initialize(); err != nil {
-		return Window{}, err
+		return Player{}, err
 	}
 
-	w := Window{
-		mpv:    m,
-		main:   os.Args[1],
-		sub:    "",
-		flags:  []string{},
+	p := Player{
 		eventC: make(chan any),
+		doneC:  make(chan struct{}),
 	}
 
-	go w.Serve(ctx)
+	go p.run(ctx, m)
 
-	return w, nil
+	return p, nil
 }
 
-type Window struct {
-	mpv    *mpv.Mpv
-	main   string
-	sub    string
-	flags  []string
+type Player struct {
 	eventC chan any
+	doneC  chan struct{}
 }
 
-func (w Window) Serve(ctx context.Context) {
+func (p Player) run(ctx context.Context, m *mpv.Mpv) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if err := w.mpv.Command([]string{"loadfile", w.main}); err != nil {
-		slog.Error("Failed to load file", "error", err)
-	}
+	defer close(p.doneC)
 
-	eventC := mpvListenEvents(ctx, w.mpv)
+	eventC := playerListenEvents(ctx, m)
 
 	for {
 		select {
-		case e := <-w.eventC:
-			switch e.(type) {
+		case <-ctx.Done():
+			return
+		case e := <-p.eventC:
+			switch e := e.(type) {
+			case PlayerCommandLoadFile:
+				if err := m.Command([]string{"loadfile", e.File}); err != nil {
+					slog.Error("Failed to load file", "error", err)
+				}
 			}
 		case e, ok := <-eventC:
 			if !ok {
@@ -77,7 +85,7 @@ func (w Window) Serve(ctx context.Context) {
 				value := prop.Data.(int)
 				fmt.Println("property:", prop.Name, value)
 			case mpv.EventFileLoaded:
-				p, err := w.mpv.GetProperty("media-title", mpv.FormatString)
+				p, err := m.GetProperty("media-title", mpv.FormatString)
 				if err != nil {
 					fmt.Println("error:", err)
 				}
@@ -106,16 +114,18 @@ func (w Window) Serve(ctx context.Context) {
 	}
 }
 
-func (w Window) Send(ctx context.Context, cmd any) error {
+func (p Player) Send(ctx context.Context, cmd any) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case w.eventC <- cmd:
+	case <-p.doneC:
+		return ErrPlayerClosed
+	case p.eventC <- cmd:
 		return nil
 	}
 }
 
-func mpvListenEvents(ctx context.Context, m *mpv.Mpv) chan *mpv.Event {
+func playerListenEvents(ctx context.Context, m *mpv.Mpv) chan *mpv.Event {
 	eventC := make(chan *mpv.Event)
 	go func() {
 		defer close(eventC)
