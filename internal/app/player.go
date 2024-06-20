@@ -37,7 +37,7 @@ func NewPlayer(ctx context.Context, wid xproto.Window) (Player, error) {
 	_ = m.SetOptionString("loop-file", "inf")              // loop video
 
 	// Custom options
-	_ = m.SetOptionString("hwdec", "auto")
+	_ = m.SetOptionString("hwdec", "vaapi")
 	_ = m.SetOptionString("profile", "low-latency")
 	_ = m.SetOption("cache", mpv.FormatFlag, false)
 
@@ -141,21 +141,21 @@ func (p Player) Send(ctx context.Context, cmd any) error {
 
 func playerListenEvents(ctx context.Context, m *mpv.Mpv) chan *mpv.Event {
 	eventC := make(chan *mpv.Event)
-	go func() {
-		defer close(eventC)
-		for {
-			e := m.WaitEvent(10000)
-			if e.Error != nil {
-				slog.Error("Failed to listen for events", "error", e.Error)
-				return
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case eventC <- e:
-			}
-		}
-	}()
+	// go func() {
+	// 	defer close(eventC)
+	// 	for {
+	// 		e := m.WaitEvent(10000)
+	// 		if e.Error != nil {
+	// 			slog.Error("Failed to listen for events", "error", e.Error)
+	// 			return
+	// 		}
+	//
+	// 		select {
+	// 		case <-ctx.Done():
+	// 			return
+	// 		case eventC <- e:
+	// 		}
+	// 	}
+	// }()
 	return eventC
 }
