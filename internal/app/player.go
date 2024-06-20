@@ -63,13 +63,24 @@ type Player struct {
 	doneC  chan struct{}
 }
 
+func (p Player) Send(ctx context.Context, cmd any) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-p.doneC:
+		return ErrPlayerClosed
+	case p.eventC <- cmd:
+		return nil
+	}
+}
+
 func (p Player) run(ctx context.Context, m *mpv.Mpv) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	defer close(p.doneC)
 
-	eventC := playerListenEvents(ctx, m)
+	p.handleEvents(m)
 
 	for {
 		select {
@@ -88,8 +99,16 @@ func (p Player) run(ctx context.Context, m *mpv.Mpv) {
 					slog.Error("Failed to mute", "error", err)
 				}
 			}
-		case e, ok := <-eventC:
-			if !ok {
+		}
+	}
+}
+
+func (p Player) handleEvents(m *mpv.Mpv) {
+	go func() {
+		for {
+			e := m.WaitEvent(10000)
+			if e.Error != nil {
+				slog.Error("Failed to listen for events", "error", e.Error)
 				return
 			}
 
@@ -125,37 +144,5 @@ func (p Player) run(ctx context.Context, m *mpv.Mpv) {
 				fmt.Println("event:", e.EventID)
 			}
 		}
-	}
-}
-
-func (p Player) Send(ctx context.Context, cmd any) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-p.doneC:
-		return ErrPlayerClosed
-	case p.eventC <- cmd:
-		return nil
-	}
-}
-
-func playerListenEvents(ctx context.Context, m *mpv.Mpv) chan *mpv.Event {
-	eventC := make(chan *mpv.Event)
-	// go func() {
-	// 	defer close(eventC)
-	// 	for {
-	// 		e := m.WaitEvent(10000)
-	// 		if e.Error != nil {
-	// 			slog.Error("Failed to listen for events", "error", e.Error)
-	// 			return
-	// 		}
-	//
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			return
-	// 		case eventC <- e:
-	// 		}
-	// 	}
-	// }()
-	return eventC
+	}()
 }
