@@ -15,8 +15,8 @@ import (
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
 	"github.com/ItsNotGoodName/x-ipcviewer/pkg/sutureext"
 	"github.com/danielgtaylor/huma/v2/humacli"
-	_ "github.com/gen2brain/go-mpv"
 	"github.com/joho/godotenv"
+	_ "github.com/k0kubun/pp"
 	"github.com/phsym/console-slog"
 )
 

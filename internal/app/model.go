@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"slices"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
+	"github.com/k0kubun/pp"
 )
 
 type Model struct {
@@ -18,6 +18,7 @@ type Model struct {
 	RootWID          xproto.Window
 	RootWidth        uint16
 	RootHeight       uint16
+	StreamGPU        string
 	StreamFullscreen string
 	StreamSelected   string
 	Streams          []ModelStream
@@ -55,6 +56,7 @@ func (m Model) Init(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 		panic(err)
 	}
 
+	m.StreamGPU = config.GPU
 	m.View = config.View
 
 	return m, nil
@@ -77,23 +79,23 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		switch ev.Detail {
 		case xproto.ButtonIndex1: // Left click
 			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return ev.Child == p.WID })
-			if idx == -1 {
-				return m, nil
+			if idx != -1 {
+				m.StreamFullscreen = m.Streams[idx].UUID
 			}
-
-			return m.fullscreen(ctx, m.Streams[idx].UUID), nil
+			return m, nil
 		case xproto.ButtonIndex3: // Right click
-			return m.fullscreen(ctx, ""), nil
+			m.StreamFullscreen = ""
+			return m, nil
+		default:
+			return m, nil
 		}
-
-		return m, nil
 	case xproto.KeyPressEvent:
 		slog.Debug("KeyPressEvent", "detail", ev.String())
 
 		switch ev.Detail {
 		case 24: // q
 			slog.Debug("exit: quit key pressed")
-			return m.Close(conn), xwm.Quit
+			return m.Close(ctx, conn), xwm.Quit
 		case 113: // <left>
 			if len(m.Streams) == 0 {
 				return m, nil
@@ -101,10 +103,12 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return p.UUID == m.StreamFullscreen })
 			if idx == -1 {
-				return m.fullscreen(ctx, m.Streams[len(m.Streams)-1].UUID), nil
+				m.StreamFullscreen = m.Streams[len(m.Streams)-1].UUID
+			} else {
+				m.StreamFullscreen = m.Streams[(len(m.Streams)+idx-1)%len(m.Streams)].UUID
 			}
 
-			return m.fullscreen(ctx, m.Streams[(len(m.Streams)+idx-1)%len(m.Streams)].UUID), nil
+			return m, nil
 		case 114: // <right>
 			if len(m.Streams) == 0 {
 				return m, nil
@@ -112,17 +116,22 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return p.UUID == m.StreamFullscreen })
 			if idx == -1 {
-				return m.fullscreen(ctx, m.Streams[0].UUID), nil
+				m.StreamFullscreen = m.Streams[0].UUID
+			} else {
+				m.StreamFullscreen = m.Streams[(idx+1)%len(m.Streams)].UUID
 			}
 
-			return m.fullscreen(ctx, m.Streams[(idx+1)%len(m.Streams)].UUID), nil
+			return m, nil
 		case 111: // <up>
 			return m, nil
 		case 116: // <down>
 			return m, nil
 		case 166: // <back>
-			return m.fullscreen(ctx, ""), nil
+			m.StreamFullscreen = ""
+			return m, nil
 		case 65: // <space>
+			m.Streams = clearModelStreams(ctx, conn, m.Streams)
+
 			config, err := m.Store.GetConfig()
 			if err != nil {
 				return m, xwm.Error(err)
@@ -134,7 +143,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 					return m, xwm.Error(err)
 				}
 
-				player, err := NewPlayer(ctx, wid)
+				player, err := NewPlayer(ctx, wid, m.StreamGPU)
 				if err != nil {
 					xwm.DestroySubWindow(conn, wid)
 					return m, xwm.Error(err)
@@ -148,16 +157,8 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 					Player: player,
 				})
 
-				player.Send(ctx, PlayerCommandLoadFile{
-					File: stream.Sub,
-				})
-
 				if i == 0 {
 					m.StreamSelected = stream.UUID
-				} else {
-					player.Send(ctx, PlayerCommandVolume{
-						Volume: 0,
-					})
 				}
 			}
 
@@ -187,7 +188,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		// https://github.com/jezek/xgbutil/blob/master/_examples/graceful-window-close/main.go
 		slog.Debug("exit: destroy notify event")
 
-		return m.Close(conn), xwm.Quit
+		return m.Close(ctx, conn), xwm.Quit
 	default:
 		slog.Debug("unknown event", "event", ev)
 		return m, nil
@@ -195,17 +196,74 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 }
 
 func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
-	idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return p.UUID == m.StreamFullscreen })
-
-	if idx == -1 {
-		if m.View != "grid" {
-			return fmt.Errorf("view %s not supported", m.View)
+	// File
+	for _, s := range m.Streams {
+		if s.UUID == m.StreamFullscreen {
+			err := s.Player.Send(ctx, PlayerCommandLoad{
+				File: s.Main,
+			})
+			if err != nil {
+				return err
+			}
+		} else {
+			err := s.Player.Send(ctx, PlayerCommandLoad{
+				File: s.Sub,
+			})
+			if err != nil {
+				return err
+			}
 		}
+	}
 
+	// Volume
+	for _, s := range m.Streams {
+		if s.UUID == m.StreamSelected {
+			err := s.Player.Send(ctx, PlayerCommandVolume{
+				Volume: 100,
+			})
+			if err != nil {
+				return err
+			}
+		} else {
+			err := s.Player.Send(ctx, PlayerCommandVolume{
+				Volume: 0,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Layout
+	if slices.ContainsFunc(m.Streams, func(p ModelStream) bool { return p.UUID == m.StreamFullscreen }) {
+		// Fullscreen
+		for _, s := range m.Streams {
+			if s.UUID == m.StreamFullscreen {
+				// Configure fullscreen
+				err := xproto.ConfigureWindowChecked(conn, s.WID,
+					xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight|xproto.ConfigWindowStackMode,
+					[]uint32{uint32(0), uint32(0), uint32(m.RootWidth), uint32(m.RootHeight), 0}).
+					Check()
+				if err != nil {
+					return err
+				}
+
+				// Play
+				err = s.Player.Send(ctx, PlayerCommandState{
+					State: PlayerStatePlaying,
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+	} else {
+		// Grid
 		layout := NewLayoutGrid(m.RootWidth, m.RootHeight, len(m.Streams))
 		for i := range m.Streams {
 			x, y, w, h := layout.Pane(i)
 
+			// Configure pane
 			err := xproto.ConfigureWindowChecked(conn, m.Streams[i].WID,
 				xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight,
 				[]uint32{uint32(x), uint32(y), uint32(w), uint32(h)}).
@@ -213,43 +271,35 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 			if err != nil {
 				return err
 			}
-		}
 
-		return nil
-	} else {
-		x, y, w, h := int16(0), int16(0), m.RootWidth, m.RootHeight
-
-		err := xproto.ConfigureWindowChecked(conn, m.Streams[idx].WID,
-			xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight|xproto.ConfigWindowStackMode,
-			[]uint32{uint32(x), uint32(y), uint32(w), uint32(h), 0}).
-			Check()
-		if err != nil {
-			fmt.Println(err)
-			return err
-		}
-
-		return nil
-	}
-}
-
-func (m Model) Close(conn *xgb.Conn) Model {
-	return m
-}
-
-func (m Model) fullscreen(ctx context.Context, uuid string) Model {
-	m.StreamFullscreen = uuid
-
-	for _, p := range m.Streams {
-		if p.UUID == m.StreamFullscreen {
-			p.Player.Send(ctx, PlayerCommandLoadFile{
-				File: p.Main,
+			// Play
+			err = m.Streams[i].Player.Send(ctx, PlayerCommandState{
+				State: PlayerStatePlaying,
 			})
-		} else {
-			p.Player.Send(ctx, PlayerCommandLoadFile{
-				File: p.Sub,
-			})
+			if err != nil {
+				return err
+			}
+			err = m.Streams[i].Player.Send(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
+	return nil
+}
+
+func (m Model) Close(ctx context.Context, conn *xgb.Conn) Model {
+	m.Streams = clearModelStreams(ctx, conn, m.Streams)
 	return m
+}
+
+func clearModelStreams(ctx context.Context, conn *xgb.Conn, streams []ModelStream) []ModelStream {
+	pp.Println("START")
+	for _, s := range streams {
+		s.Player.Close(ctx)
+		xwm.DestroySubWindow(conn, s.WID)
+	}
+	pp.Println("END")
+	return []ModelStream{}
 }

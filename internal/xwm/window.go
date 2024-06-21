@@ -74,5 +74,5 @@ func CreateSubWindow(conn *xgb.Conn, root xproto.Window) (xproto.Window, error) 
 }
 
 func DestroySubWindow(conn *xgb.Conn, wid xproto.Window) {
-	xproto.DestroyWindow(conn, wid)
+	xproto.DestroySubwindows(conn, wid).Check()
 }
