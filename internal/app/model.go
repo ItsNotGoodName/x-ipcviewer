@@ -13,18 +13,19 @@ import (
 )
 
 type Model struct {
-	Provider       config.Provider
-	WID            xproto.Window
-	Width          uint16
-	Height         uint16
-	Panes          []ModelPane
-	FullscreenUUID string
-	SelectedUUID   string
-	View           string
-	ViewManual     []ModelViewManual
+	Store config.Store
+
+	RootWID          xproto.Window
+	RootWidth        uint16
+	RootHeight       uint16
+	StreamFullscreen string
+	StreamSelected   string
+	Streams          []ModelStream
+	View             string
+	Views            []ModelView
 }
 
-type ModelPane struct {
+type ModelStream struct {
 	UUID   string
 	WID    xproto.Window
 	Main   string
@@ -32,7 +33,7 @@ type ModelPane struct {
 	Player Player
 }
 
-type ModelViewManual struct {
+type ModelView struct {
 	X int16
 	Y int16
 	W uint16
@@ -45,10 +46,16 @@ func (m Model) Init(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 		panic(err)
 	}
 
-	m.View = "grid"
-	m.WID = window.WID
-	m.Width = window.Width
-	m.Height = window.Height
+	m.RootWID = window.WID
+	m.RootWidth = window.Width
+	m.RootHeight = window.Height
+
+	config, err := m.Store.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	m.View = config.View
 
 	return m, nil
 }
@@ -58,9 +65,9 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 	case xproto.ConfigureNotifyEvent:
 		slog.Debug("ConfigureNotifyEvent:", "event", ev.String())
 
-		if ev.Window == m.WID {
-			m.Width = ev.Width
-			m.Height = ev.Height
+		if ev.Window == m.RootWID {
+			m.RootWidth = ev.Width
+			m.RootHeight = ev.Height
 		}
 
 		return m, nil
@@ -68,65 +75,61 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		slog.Debug("ButtonPressEvent", "detail", ev.String())
 
 		switch ev.Detail {
-		case xproto.ButtonIndex1:
-			idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return ev.Child == p.WID })
+		case xproto.ButtonIndex1: // Left click
+			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return ev.Child == p.WID })
 			if idx == -1 {
 				return m, nil
 			}
 
-			m.FullscreenUUID = m.Panes[idx].UUID
-
-			for _, p := range m.Panes {
-				if p.UUID == m.FullscreenUUID {
-					p.Player.Send(ctx, PlayerCommandLoadFile{
-						File: p.Main,
-					})
-				} else {
-					p.Player.Send(ctx, PlayerCommandLoadFile{
-						File: p.Sub,
-					})
-				}
-			}
-
-			return m, func(ctx context.Context) xwm.Msg { return m.Panes[idx].Player.Send(ctx, "") }
-		case xproto.ButtonIndex3:
-			idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return p.UUID == m.FullscreenUUID })
-			if idx == -1 {
-				return m, nil
-			}
-
-			m.FullscreenUUID = ""
-
-			for _, p := range m.Panes {
-				if p.UUID == m.FullscreenUUID {
-					p.Player.Send(ctx, PlayerCommandLoadFile{
-						File: p.Main,
-					})
-				} else {
-					p.Player.Send(ctx, PlayerCommandLoadFile{
-						File: p.Sub,
-					})
-				}
-			}
+			return m.fullscreen(ctx, m.Streams[idx].UUID), nil
+		case xproto.ButtonIndex3: // Right click
+			return m.fullscreen(ctx, ""), nil
 		}
 
 		return m, nil
 	case xproto.KeyPressEvent:
 		slog.Debug("KeyPressEvent", "detail", ev.String())
 
-		if ev.Detail == 24 {
+		switch ev.Detail {
+		case 24: // q
 			slog.Debug("exit: quit key pressed")
 			return m.Close(conn), xwm.Quit
-		}
+		case 113: // <left>
+			if len(m.Streams) == 0 {
+				return m, nil
+			}
 
-		if ev.Detail == 65 {
-			config, err := m.Provider.GetConfig()
+			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return p.UUID == m.StreamFullscreen })
+			if idx == -1 {
+				return m.fullscreen(ctx, m.Streams[len(m.Streams)-1].UUID), nil
+			}
+
+			return m.fullscreen(ctx, m.Streams[(len(m.Streams)+idx-1)%len(m.Streams)].UUID), nil
+		case 114: // <right>
+			if len(m.Streams) == 0 {
+				return m, nil
+			}
+
+			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return p.UUID == m.StreamFullscreen })
+			if idx == -1 {
+				return m.fullscreen(ctx, m.Streams[0].UUID), nil
+			}
+
+			return m.fullscreen(ctx, m.Streams[(idx+1)%len(m.Streams)].UUID), nil
+		case 111: // <up>
+			return m, nil
+		case 116: // <down>
+			return m, nil
+		case 166: // <back>
+			return m.fullscreen(ctx, ""), nil
+		case 65: // <space>
+			config, err := m.Store.GetConfig()
 			if err != nil {
 				return m, xwm.Error(err)
 			}
 
 			for i, stream := range config.Streams {
-				wid, err := xwm.CreateSubWindow(conn, m.WID)
+				wid, err := xwm.CreateSubWindow(conn, m.RootWID)
 				if err != nil {
 					return m, xwm.Error(err)
 				}
@@ -137,7 +140,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 					return m, xwm.Error(err)
 				}
 
-				m.Panes = append(m.Panes, ModelPane{
+				m.Streams = append(m.Streams, ModelStream{
 					UUID:   stream.UUID,
 					WID:    wid,
 					Main:   stream.Main,
@@ -150,7 +153,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 				})
 
 				if i == 0 {
-					m.SelectedUUID = stream.UUID
+					m.StreamSelected = stream.UUID
 				} else {
 					player.Send(ctx, PlayerCommandVolume{
 						Volume: 0,
@@ -159,9 +162,9 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 			}
 
 			return m, nil
+		default:
+			return m, nil
 		}
-
-		return m, nil
 	case xproto.DestroyNotifyEvent:
 		// Depending on the user's desktop environment (especially
 		// window manager), killing a window might close the
@@ -192,18 +195,18 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 }
 
 func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
-	idx := slices.IndexFunc(m.Panes, func(p ModelPane) bool { return p.UUID == m.FullscreenUUID })
+	idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return p.UUID == m.StreamFullscreen })
 
 	if idx == -1 {
 		if m.View != "grid" {
 			return fmt.Errorf("view %s not supported", m.View)
 		}
 
-		layout := NewLayoutGrid(m.Width, m.Height, len(m.Panes))
-		for i := range m.Panes {
+		layout := NewLayoutGrid(m.RootWidth, m.RootHeight, len(m.Streams))
+		for i := range m.Streams {
 			x, y, w, h := layout.Pane(i)
 
-			err := xproto.ConfigureWindowChecked(conn, m.Panes[i].WID,
+			err := xproto.ConfigureWindowChecked(conn, m.Streams[i].WID,
 				xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight,
 				[]uint32{uint32(x), uint32(y), uint32(w), uint32(h)}).
 				Check()
@@ -214,9 +217,9 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 
 		return nil
 	} else {
-		x, y, w, h := int16(0), int16(0), m.Width, m.Height
+		x, y, w, h := int16(0), int16(0), m.RootWidth, m.RootHeight
 
-		err := xproto.ConfigureWindowChecked(conn, m.Panes[idx].WID,
+		err := xproto.ConfigureWindowChecked(conn, m.Streams[idx].WID,
 			xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight|xproto.ConfigWindowStackMode,
 			[]uint32{uint32(x), uint32(y), uint32(w), uint32(h), 0}).
 			Check()
@@ -230,5 +233,23 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 }
 
 func (m Model) Close(conn *xgb.Conn) Model {
+	return m
+}
+
+func (m Model) fullscreen(ctx context.Context, uuid string) Model {
+	m.StreamFullscreen = uuid
+
+	for _, p := range m.Streams {
+		if p.UUID == m.StreamFullscreen {
+			p.Player.Send(ctx, PlayerCommandLoadFile{
+				File: p.Main,
+			})
+		} else {
+			p.Player.Send(ctx, PlayerCommandLoadFile{
+				File: p.Sub,
+			})
+		}
+	}
+
 	return m
 }

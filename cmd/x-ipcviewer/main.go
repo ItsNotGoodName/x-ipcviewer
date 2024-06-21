@@ -47,17 +47,17 @@ func main() {
 				return err
 			}
 
-			provider, err := config.NewProvider(configFilePath)
+			store, err := config.NewStore(config.NewYAML(configFilePath))
 			if err != nil {
 				return err
 			}
 
-			if err := app.NormalizeConfig(provider); err != nil {
+			if err := app.NormalizeConfig(store); err != nil {
 				return err
 			}
 
 			sutureext.Add(root, xwm.NewProgram(app.Model{
-				Provider: provider,
+				Store: store,
 			}))
 
 			return root.Serve(ctx)

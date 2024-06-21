@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func NormalizeConfig(provider config.Provider) error {
-	return provider.UpdateConfig(func(cfg config.Config) (config.Config, error) {
+func NormalizeConfig(store config.Store) error {
+	return store.UpdateConfig(func(cfg config.Config) (config.Config, error) {
 		for i := range cfg.Streams {
 			if cfg.Streams[i].UUID == "" {
 				cfg.Streams[i].UUID = uuid.NewString()
