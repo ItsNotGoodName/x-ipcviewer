@@ -9,7 +9,6 @@ import (
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
-	"github.com/k0kubun/pp"
 )
 
 type Model struct {
@@ -130,35 +129,49 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 			m.StreamFullscreen = ""
 			return m, nil
 		case 65: // <space>
-			m.Streams = clearModelStreams(ctx, conn, m.Streams)
-
-			config, err := m.Store.GetConfig()
+			cfg, err := m.Store.GetConfig()
 			if err != nil {
 				return m, xwm.Error(err)
 			}
 
-			for i, stream := range config.Streams {
-				wid, err := xwm.CreateSubWindow(conn, m.RootWID)
-				if err != nil {
-					return m, xwm.Error(err)
+			// Delete
+			var newStreams []ModelStream
+			for _, stream := range m.Streams {
+				if slices.ContainsFunc(cfg.Streams, func(s config.Stream) bool { return s.UUID == stream.UUID }) {
+					newStreams = append(newStreams, stream)
+				} else {
+					closeModelStream(ctx, conn, stream)
 				}
+			}
+			m.Streams = newStreams
 
-				player, err := NewPlayer(ctx, wid, m.StreamGPU)
-				if err != nil {
-					xwm.DestroySubWindow(conn, wid)
-					return m, xwm.Error(err)
-				}
+			// Create or update
+			for _, stream := range cfg.Streams {
+				idx := slices.IndexFunc(m.Streams, func(s ModelStream) bool { return s.UUID == stream.UUID })
+				if idx == -1 {
+					// Create
+					wid, err := xwm.CreateSubWindow(conn, m.RootWID)
+					if err != nil {
+						return m, xwm.Error(err)
+					}
 
-				m.Streams = append(m.Streams, ModelStream{
-					UUID:   stream.UUID,
-					WID:    wid,
-					Main:   stream.Main,
-					Sub:    stream.Sub,
-					Player: player,
-				})
+					player, err := NewPlayer(ctx, wid, m.StreamGPU)
+					if err != nil {
+						xwm.DestroySubWindow(conn, wid)
+						return m, xwm.Error(err)
+					}
 
-				if i == 0 {
-					m.StreamSelected = stream.UUID
+					m.Streams = append(m.Streams, ModelStream{
+						UUID:   stream.UUID,
+						WID:    wid,
+						Main:   stream.Main,
+						Sub:    stream.Sub,
+						Player: player,
+					})
+				} else {
+					// Update
+					m.Streams[idx].Main = stream.Main
+					m.Streams[idx].Sub = stream.Sub
 				}
 			}
 
@@ -290,16 +303,14 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 }
 
 func (m Model) Close(ctx context.Context, conn *xgb.Conn) Model {
-	m.Streams = clearModelStreams(ctx, conn, m.Streams)
+	for _, stream := range m.Streams {
+		closeModelStream(ctx, conn, stream)
+	}
+	m.Streams = []ModelStream{}
 	return m
 }
 
-func clearModelStreams(ctx context.Context, conn *xgb.Conn, streams []ModelStream) []ModelStream {
-	pp.Println("START")
-	for _, s := range streams {
-		s.Player.Close(ctx)
-		xwm.DestroySubWindow(conn, s.WID)
-	}
-	pp.Println("END")
-	return []ModelStream{}
+func closeModelStream(ctx context.Context, conn *xgb.Conn, stream ModelStream) {
+	stream.Player.Close(ctx)
+	xwm.DestroySubWindow(conn, stream.WID)
 }
