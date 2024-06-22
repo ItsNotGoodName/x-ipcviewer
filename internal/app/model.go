@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
@@ -14,6 +15,7 @@ import (
 type Model struct {
 	Store config.Store
 
+	LastLeftClick    time.Time
 	RootWID          xproto.Window
 	RootWidth        uint16
 	RootHeight       uint16
@@ -77,10 +79,23 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 		switch ev.Detail {
 		case xproto.ButtonIndex1: // Left click
+			now := time.Now()
+			clickInterval := now.Sub(m.LastLeftClick)
+			m.LastLeftClick = now
+
 			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return ev.Child == p.WID })
-			if idx != -1 {
-				m.StreamFullscreen = m.Streams[idx].UUID
+			if idx == -1 {
+				return m, nil
 			}
+
+			if clickInterval < 500*time.Millisecond {
+				// Double click
+				m.StreamFullscreen = m.Streams[idx].UUID
+			} else {
+				// Single click
+				m.StreamSelected = m.Streams[idx].UUID
+			}
+
 			return m, nil
 		case xproto.ButtonIndex3: // Right click
 			m.StreamFullscreen = ""
@@ -150,7 +165,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 				idx := slices.IndexFunc(m.Streams, func(s ModelStream) bool { return s.UUID == stream.UUID })
 				if idx == -1 {
 					// Create
-					wid, err := xwm.CreateSubWindow(conn, m.RootWID)
+					wid, err := xwm.CreateSubWindow(conn, m.RootWID, 0, 0, m.RootWidth, m.RootHeight)
 					if err != nil {
 						return m, xwm.Error(err)
 					}
@@ -261,6 +276,11 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 					return err
 				}
 
+				// Show window
+				if err = xproto.MapWindowChecked(conn, s.WID).Check(); err != nil {
+					return err
+				}
+
 				// Play
 				err = s.Player.Send(ctx, PlayerCommandState{
 					State: PlayerStatePlaying,
@@ -268,6 +288,8 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 				if err != nil {
 					return err
 				}
+			} else {
+				xproto.UnmapWindow(conn, s.WID)
 			}
 		}
 	} else {
@@ -285,14 +307,15 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 				return err
 			}
 
+			// Show window
+			if err = xproto.MapWindowChecked(conn, m.Streams[i].WID).Check(); err != nil {
+				return err
+			}
+
 			// Play
 			err = m.Streams[i].Player.Send(ctx, PlayerCommandState{
 				State: PlayerStatePlaying,
 			})
-			if err != nil {
-				return err
-			}
-			err = m.Streams[i].Player.Send(ctx)
 			if err != nil {
 				return err
 			}
