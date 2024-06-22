@@ -38,10 +38,6 @@ func CreateWindow(conn *xgb.Conn) (Window, error) {
 		return Window{}, err
 	}
 
-	if err := xproto.MapWindowChecked(conn, wid).Check(); err != nil {
-		return Window{}, err
-	}
-
 	return Window{
 		WID:    wid,
 		Width:  screen.WidthInPixels,

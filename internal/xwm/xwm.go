@@ -62,10 +62,10 @@ func (p Program) Serve(ctx context.Context) error {
 	}
 	defer conn.Close()
 
-	cmdC := make(chan Cmd)
-	p.handleCommands(ctx, cmdC)
-	listEventsDoneC := p.listenEvents(ctx, conn)
+	cmdC := p.handleCommands(ctx)
+	doneC := p.listenEvents(ctx, conn)
 
+	// Init
 	model, cmd := p.initialModel.Init(ctx, conn)
 	if cmd != nil {
 		select {
@@ -75,12 +75,17 @@ func (p Program) Serve(ctx context.Context) error {
 		}
 	}
 
+	// Initial render
+	if err := model.Render(ctx, conn); err != nil {
+		slog.Error("Failed to render", "error", err)
+	}
+
 	for {
 		// Message
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-listEventsDoneC:
+		case <-doneC:
 			return suture.ErrTerminateSupervisorTree
 		case msg := <-p.msgC:
 			// Handle
@@ -142,14 +147,15 @@ func (p Program) listenEvents(ctx context.Context, conn *xgb.Conn) chan struct{}
 	return doneC
 }
 
-func (p Program) handleCommands(ctx context.Context, cmds chan Cmd) {
+func (p Program) handleCommands(ctx context.Context) chan<- Cmd {
+	cmdC := make(chan Cmd)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 
-			case cmd := <-cmds:
+			case cmd := <-cmdC:
 				if cmd == nil {
 					continue
 				}
@@ -161,4 +167,5 @@ func (p Program) handleCommands(ctx context.Context, cmds chan Cmd) {
 			}
 		}
 	}()
+	return cmdC
 }

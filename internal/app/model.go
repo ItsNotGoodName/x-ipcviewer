@@ -145,53 +145,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 			m.StreamFullscreen = ""
 			return m, nil
 		case 65: // <space>
-			cfg, err := m.Store.GetConfig()
-			if err != nil {
-				return m, xwm.Error(err)
-			}
-
-			// Delete
-			var newStreams []ModelStream
-			for _, stream := range m.Streams {
-				if slices.ContainsFunc(cfg.Streams, func(s config.Stream) bool { return s.UUID == stream.UUID }) {
-					newStreams = append(newStreams, stream)
-				} else {
-					closeModelStream(ctx, conn, stream)
-				}
-			}
-			m.Streams = newStreams
-
-			// Create or update
-			for _, stream := range cfg.Streams {
-				idx := slices.IndexFunc(m.Streams, func(s ModelStream) bool { return s.UUID == stream.UUID })
-				if idx == -1 {
-					// Create
-					wid, err := xwm.CreateSubWindow(conn, m.RootWID, 0, 0, m.RootWidth, m.RootHeight)
-					if err != nil {
-						return m, xwm.Error(err)
-					}
-
-					player, err := NewPlayer(ctx, wid, m.StreamGPU)
-					if err != nil {
-						xwm.DestroySubWindow(conn, wid)
-						return m, xwm.Error(err)
-					}
-
-					m.Streams = append(m.Streams, ModelStream{
-						UUID:   stream.UUID,
-						WID:    wid,
-						Main:   stream.Main,
-						Sub:    stream.Sub,
-						Player: player,
-					})
-				} else {
-					// Update
-					m.Streams[idx].Main = stream.Main
-					m.Streams[idx].Sub = stream.Sub
-				}
-			}
-
-			return m, nil
+			return m.syncStreams(ctx, conn)
 		default:
 			return m, nil
 		}
@@ -225,6 +179,8 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 }
 
 func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
+	xproto.MapWindow(conn, m.RootWID)
+
 	// File
 	for _, s := range m.Streams {
 		if s.UUID == m.StreamFullscreen {
@@ -324,6 +280,55 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 	}
 
 	return nil
+}
+
+func (m Model) syncStreams(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
+	cfg, err := m.Store.GetConfig()
+	if err != nil {
+		return m, xwm.Error(err)
+	}
+
+	var newStreams []ModelStream
+	for _, cfgStream := range cfg.Streams {
+		idx := slices.IndexFunc(m.Streams, func(s ModelStream) bool { return s.UUID == cfgStream.UUID })
+		if idx == -1 {
+			// Create
+			wid, err := xwm.CreateSubWindow(conn, m.RootWID, 0, 0, m.RootWidth, m.RootHeight)
+			if err != nil {
+				return m, xwm.Error(err)
+			}
+
+			player, err := NewPlayer(ctx, wid, m.StreamGPU)
+			if err != nil {
+				return m, xwm.Error(err)
+			}
+
+			newStreams = append(newStreams, ModelStream{
+				UUID:   cfgStream.UUID,
+				WID:    wid,
+				Main:   cfgStream.Main,
+				Sub:    cfgStream.Sub,
+				Player: player,
+			})
+		} else {
+			// Update
+			stream := m.Streams[idx]
+			stream.Main = cfgStream.Main
+			stream.Sub = cfgStream.Sub
+			newStreams = append(newStreams, stream)
+		}
+	}
+
+	// Delete
+	for _, stream := range m.Streams {
+		if !slices.ContainsFunc(cfg.Streams, func(s config.Stream) bool { return s.UUID == stream.UUID }) {
+			closeModelStream(ctx, conn, stream)
+		}
+	}
+
+	m.Streams = newStreams
+
+	return m, nil
 }
 
 func (m Model) Close(ctx context.Context, conn *xgb.Conn) Model {
