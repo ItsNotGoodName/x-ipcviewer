@@ -79,20 +79,21 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 		switch ev.Detail {
 		case xproto.ButtonIndex1: // Left click
-			now := time.Now()
-			clickInterval := now.Sub(m.LastLeftClick)
-			m.LastLeftClick = now
+			var doubleClick bool
+			m.LastLeftClick, doubleClick = checkLeftClick(m.LastLeftClick)
 
 			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return ev.Child == p.WID })
 			if idx == -1 {
 				return m, nil
 			}
 
-			if clickInterval < 500*time.Millisecond {
-				// Double click
-				m.StreamFullscreen = m.Streams[idx].UUID
+			if doubleClick {
+				if m.StreamFullscreen == "" {
+					m.StreamFullscreen = m.Streams[idx].UUID
+				} else {
+					m.StreamFullscreen = ""
+				}
 			} else {
-				// Single click
 				m.StreamSelected = m.Streams[idx].UUID
 			}
 
@@ -335,5 +336,15 @@ func (m Model) Close(ctx context.Context, conn *xgb.Conn) Model {
 
 func closeModelStream(ctx context.Context, conn *xgb.Conn, stream ModelStream) {
 	stream.Player.Close(ctx)
+	xproto.UnmapWindow(conn, stream.WID)
 	xwm.DestroySubWindow(conn, stream.WID)
+}
+
+func checkLeftClick(lastLeftClick time.Time) (time.Time, bool) {
+	now := time.Now()
+	if now.Sub(lastLeftClick) < 500*time.Millisecond {
+		return time.Time{}, true
+	} else {
+		return now, false
+	}
 }
