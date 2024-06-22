@@ -23,8 +23,6 @@ type Model struct {
 	StreamFullscreen string
 	StreamSelected   string
 	Streams          []ModelStream
-	View             string
-	Views            []ModelView
 }
 
 type ModelStream struct {
@@ -58,7 +56,6 @@ func (m Model) Init(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 	}
 
 	m.StreamGPU = config.GPU
-	m.View = config.View
 
 	return m.syncStreams(ctx, conn, config.Streams)
 }
