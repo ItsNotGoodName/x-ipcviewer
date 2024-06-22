@@ -60,7 +60,7 @@ func (m Model) Init(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
 	m.StreamGPU = config.GPU
 	m.View = config.View
 
-	return m, nil
+	return m.syncStreams(ctx, conn, config.Streams)
 }
 
 func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Model, xwm.Cmd) {
@@ -110,6 +110,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		switch ev.Detail {
 		case 24: // q
 			slog.Debug("exit: quit key pressed")
+
 			return m.Close(ctx, conn), xwm.Quit
 		case 113: // <left>
 			if len(m.Streams) == 0 {
@@ -144,8 +145,13 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		case 166: // <back>
 			m.StreamFullscreen = ""
 			return m, nil
-		case 65: // <space>
-			return m.syncStreams(ctx, conn)
+		case 65, 135: // <space>
+			config, err := m.Store.GetConfig()
+			if err != nil {
+				return m, xwm.Error(err)
+			}
+
+			return m.syncStreams(ctx, conn, config.Streams)
 		default:
 			return m, nil
 		}
@@ -282,14 +288,9 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 	return nil
 }
 
-func (m Model) syncStreams(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.Cmd) {
-	cfg, err := m.Store.GetConfig()
-	if err != nil {
-		return m, xwm.Error(err)
-	}
-
+func (m Model) syncStreams(ctx context.Context, conn *xgb.Conn, cfgStreams []config.Stream) (xwm.Model, xwm.Cmd) {
 	var newStreams []ModelStream
-	for _, cfgStream := range cfg.Streams {
+	for _, cfgStream := range cfgStreams {
 		idx := slices.IndexFunc(m.Streams, func(s ModelStream) bool { return s.UUID == cfgStream.UUID })
 		if idx == -1 {
 			// Create
@@ -321,7 +322,7 @@ func (m Model) syncStreams(ctx context.Context, conn *xgb.Conn) (xwm.Model, xwm.
 
 	// Delete
 	for _, stream := range m.Streams {
-		if !slices.ContainsFunc(cfg.Streams, func(s config.Stream) bool { return s.UUID == stream.UUID }) {
+		if !slices.ContainsFunc(cfgStreams, func(s config.Stream) bool { return s.UUID == stream.UUID }) {
 			closeModelStream(ctx, conn, stream)
 		}
 	}
