@@ -3,10 +3,21 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/gen2brain/go-mpv"
 	"github.com/jezek/xgb/xproto"
+)
+
+const MaxDelay = 0.5
+
+const (
+	DemuxerCacheIdle = "demuxer-cache-idle"
+	// DemuxerCacheStart = "demuxer-start-time"
+	DemuxerCacheTime = "demuxer-cache-time"
+	TimeRemaining    = "time-remaining"
 )
 
 var ErrPlayerClosed = errors.New("player closed")
@@ -41,28 +52,28 @@ func NewPlayer(ctx context.Context, wid xproto.Window, hwdec string) (Player, er
 	_ = m.SetOption("force-window", mpv.FormatFlag, true)  // render empty video when no file-loaded
 	_ = m.SetOption("idle", mpv.FormatFlag, true)          // keep window open when no file-loaded
 	_ = m.SetOptionString("loop-file", "inf")              // loop video
+	_ = m.SetOptionString("profile", "low-latency")        // low latency for RTSP streams
+	_ = m.SetOptionString("cache", "no")                   // get latest video for RTSP streams
+	// _ = m.SetOptionString("demuxer-readahead-secs", "5")   // buffer a max of 5 seconds ahead
 
 	// Custom options
 	if hwdec != "" {
 		_ = m.SetOptionString("hwdec", hwdec)
 	}
-	_ = m.SetOptionString("profile", "low-latency")
-	_ = m.SetOption("cache", mpv.FormatFlag, false)
 
 	_ = m.RequestLogMessages("info")
-	// _ = m.ObserveProperty(0, "pause", mpv.FormatFlag)
+	_ = m.ObserveProperty(0, DemuxerCacheTime, mpv.FormatDouble)
+	// _ = m.ObserveProperty(0, DemuxerCacheStart, mpv.FormatDouble)
+	_ = m.ObserveProperty(0, TimeRemaining, mpv.FormatDouble)
 
 	if err := m.Initialize(); err != nil {
 		return Player{}, err
 	}
 
 	p := Player{
-		eventC: make(chan any),
-		doneC:  make(chan struct{}),
-		closeC: make(chan struct{}),
-		file:   "",
-		volume: 0,
-		state:  PlayerStatePaused,
+		commandC: make(chan any),
+		doneC:    make(chan struct{}),
+		closeC:   make(chan struct{}),
 	}
 
 	go p.run(ctx, m)
@@ -71,12 +82,9 @@ func NewPlayer(ctx context.Context, wid xproto.Window, hwdec string) (Player, er
 }
 
 type Player struct {
-	eventC chan any
-	doneC  chan struct{}
-	closeC chan struct{}
-	file   string
-	volume int
-	state  PlayerState
+	commandC chan any
+	doneC    chan struct{}
+	closeC   chan struct{}
 }
 
 func (p Player) Send(ctx context.Context, cmds ...any) error {
@@ -86,7 +94,7 @@ func (p Player) Send(ctx context.Context, cmds ...any) error {
 			return ctx.Err()
 		case <-p.doneC:
 			return ErrPlayerClosed
-		case p.eventC <- cmd:
+		case p.commandC <- cmd:
 			return nil
 		}
 	}
@@ -106,10 +114,55 @@ func (p Player) Close(ctx context.Context) error {
 }
 
 func (p Player) run(ctx context.Context, m *mpv.Mpv) {
-	defer func() {
-		m.TerminateDestroy()
-		close(p.doneC)
-	}()
+	defer close(p.doneC)
+	defer m.TerminateDestroy()
+
+	// Tickers
+	eventTicker := time.NewTicker(time.Second)
+	defer eventTicker.Stop()
+
+	watchTicker := time.NewTicker(time.Second)
+	defer watchTicker.Stop()
+
+	// Ping
+	lastPing := time.Now()
+	ping := func() {
+		lastPing = time.Now()
+	}
+
+	// Signals
+	state := NewSignal(PlayerStatePaused)
+	file := NewSignal("")
+	volume := NewSignal(0)
+	speed := NewSignal(1.0)
+
+	syncFile := func() {
+		if file.V == "" {
+			if err := m.Command([]string{"stop"}); err != nil {
+				slog.Error("Failed to stop", "error", err)
+			}
+		} else {
+			if err := m.Command([]string{"loadfile", file.V}); err != nil {
+				slog.Error("Failed to play file", "error", err)
+			}
+		}
+		ping()
+	}
+	file.AddEffect(syncFile)
+
+	syncVolume := func() {
+		if err := m.SetProperty("volume", mpv.FormatInt64, int64(volume.V)); err != nil {
+			slog.Error("Failed to set volume", "error", err)
+		}
+	}
+	volume.AddEffect(syncVolume)
+
+	syncSpeed := func() {
+		if err := m.SetProperty("speed", mpv.FormatDouble, speed.V); err != nil {
+			slog.Error("Failed to set speed", "error", err)
+		}
+	}
+	speed.AddEffect(syncSpeed)
 
 	for {
 		select {
@@ -117,93 +170,71 @@ func (p Player) run(ctx context.Context, m *mpv.Mpv) {
 			return
 		case <-p.closeC:
 			return
-		case e := <-p.eventC:
-			switch e := e.(type) {
-			case PlayerCommandState:
-				if e.State == p.state {
-					continue
-				}
-				if e.State == PlayerStatePlaying {
-					if err := m.Command([]string{"loadfile", p.file}); err != nil {
-						slog.Error("Failed to play file", "error", err)
-						continue
-					}
-				} else {
-					if err := m.Command([]string{"stop"}); err != nil {
-						slog.Error("Failed to stop", "error", err)
-						continue
-					}
+		case <-watchTicker.C:
+			if lastPing.Add(5 * time.Second).Before(time.Now()) {
+				syncFile()
+			}
+		case <-eventTicker.C:
+		eventLoop:
+			for {
+				e := m.WaitEvent(0)
+				if e.Error != nil {
+					slog.Error("Failed to listen for events", "error", e.Error)
+					break
 				}
 
-				p.state = e.State
+				switch e.EventID {
+				case mpv.EventNone:
+					break eventLoop
+				case mpv.EventPropertyChange:
+					prop := e.Property()
+					fmt.Println("property:", prop.Name, prop.Data)
+
+					switch prop.Name {
+					// case DemuxerCacheStart:
+					case DemuxerCacheTime:
+						ping()
+					case TimeRemaining:
+						if prop.Data.(float64) > MaxDelay {
+							speed.SetValue(1.5)
+						} else {
+							speed.SetValue(1)
+						}
+					}
+				case mpv.EventFileLoaded:
+					p, err := m.GetProperty("media-title", mpv.FormatString)
+					if err != nil {
+						fmt.Println("error:", err)
+					}
+					fmt.Println("title:", p.(string))
+				case mpv.EventLogMsg:
+					msg := e.LogMessage()
+					fmt.Println("message:", msg.Text)
+				case mpv.EventStart:
+					sf := e.StartFile()
+					fmt.Println("start:", sf.EntryID)
+				case mpv.EventEnd:
+					ef := e.EndFile()
+					fmt.Println("end:", ef.EntryID, ef.Reason)
+					if ef.Reason == mpv.EndFileError {
+						fmt.Println("error:", ef.Error)
+					}
+				case mpv.EventShutdown:
+					fmt.Println("shutdown:", e.EventID)
+					break eventLoop
+				default:
+					fmt.Println("event:", e.EventID)
+				}
+			}
+		case c := <-p.commandC:
+			switch c := c.(type) {
+			case PlayerCommandState:
+				state.SetValue(c.State)
 			case PlayerCommandLoad:
-				if e.File == p.file {
-					continue
-				}
-				if err := m.Command([]string{"loadfile", e.File}); err != nil {
-					slog.Error("Failed to load file", "error", err)
-					continue
-				}
-				p.file = e.File
+				file.SetValue(c.File)
 			case PlayerCommandVolume:
-				if e.Volume == p.volume {
-					continue
-				}
-				if err := m.SetProperty("volume", mpv.FormatInt64, int64(e.Volume)); err != nil {
-					slog.Error("Failed to set volume", "error", err)
-				}
-				p.volume = e.Volume
+				volume.SetValue(c.Volume)
 			}
 		}
 	}
 }
-
-// func (p Player) handleEvents(m *mpv.Mpv, shutdownC chan struct{}) {
-// 	go func() {
-// 		for {
-// 			select {
-// 			case <-shutdownC:
-// 				return
-// 			default:
-// 			}
-//
-// 			e := m.WaitEvent(10000)
-// 			if e.Error != nil {
-// 				slog.Error("Failed to listen for events", "error", e.Error)
-// 				return
-// 			}
-//
-// 			switch e.EventID {
-// 			case mpv.EventPropertyChange:
-// 				prop := e.Property()
-// 				value := prop.Data.(int)
-// 				fmt.Println("property:", prop.Name, value)
-// 			case mpv.EventFileLoaded:
-// 				p, err := m.GetProperty("media-title", mpv.FormatString)
-// 				if err != nil {
-// 					fmt.Println("error:", err)
-// 				}
-// 				fmt.Println("title:", p.(string))
-// 			case mpv.EventLogMsg:
-// 				msg := e.LogMessage()
-// 				fmt.Println("message:", msg.Text)
-// 			case mpv.EventStart:
-// 				sf := e.StartFile()
-// 				fmt.Println("start:", sf.EntryID)
-// 			case mpv.EventEnd:
-// 				ef := e.EndFile()
-// 				fmt.Println("end:", ef.EntryID, ef.Reason)
-// 				if ef.Reason == mpv.EndFileEOF {
-// 					return
-// 				} else if ef.Reason == mpv.EndFileError {
-// 					fmt.Println("error:", ef.Error)
-// 				}
-// 			case mpv.EventShutdown:
-// 				fmt.Println("shutdown:", e.EventID)
-// 				return
-// 			default:
-// 				fmt.Println("event:", e.EventID)
-// 			}
-// 		}
-// 	}()
-// }
