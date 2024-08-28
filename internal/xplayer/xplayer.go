@@ -24,8 +24,9 @@ type (
 	CommandLoad struct {
 		File string
 	}
-	CommandPlay   struct{}
-	CommandStop   struct{}
+	CommandPlayback struct {
+		Playing bool
+	}
 	CommandVolume struct {
 		Volume int
 	}
@@ -201,13 +202,10 @@ func (p Player) run(ctx context.Context, m *mpv.Mpv) {
 			}
 		case c := <-p.commandC:
 			switch c := c.(type) {
-			case CommandPlay:
-				playing.Update(true)
+			case CommandPlayback:
+				playing.Update(c.Playing)
 			case CommandLoad:
-				playing.Update(true)
 				file.Update(c.File)
-			case CommandStop:
-				playing.Update(false)
 			case CommandVolume:
 				volume.Update(c.Volume)
 			}

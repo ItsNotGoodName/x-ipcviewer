@@ -16,6 +16,7 @@ import (
 type Model struct {
 	Store config.Store
 
+	Volume           xplayer.Volume
 	LastLeftClick    time.Time
 	RootWID          xproto.Window
 	RootWidth        uint16
@@ -137,8 +138,10 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 			return m, nil
 		case 111: // <up>
+			m.Volume.Add(5)
 			return m, nil
 		case 116: // <down>
+			m.Volume.Add(-5)
 			return m, nil
 		case 166: // <back>
 			m.StreamFullscreen = ""
@@ -208,7 +211,7 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 	for _, s := range m.Streams {
 		if s.UUID == m.StreamSelected {
 			err := s.Player.Send(ctx, xplayer.CommandVolume{
-				Volume: 100,
+				Volume: m.Volume.V,
 			})
 			if err != nil {
 				return err
@@ -243,12 +246,23 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 				}
 
 				// Play
-				err = s.Player.Send(ctx, xplayer.CommandPlay{})
+				err = s.Player.Send(ctx, xplayer.CommandPlayback{
+					Playing: true,
+				})
 				if err != nil {
 					return err
 				}
 			} else {
+				// Hide window
 				xproto.UnmapWindow(conn, s.WID)
+
+				// Stop
+				err := s.Player.Send(ctx, xplayer.CommandPlayback{
+					Playing: false,
+				})
+				if err != nil {
+					return err
+				}
 			}
 		}
 	} else {
@@ -272,7 +286,9 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 			}
 
 			// Play
-			err = m.Streams[i].Player.Send(ctx, xplayer.CommandPlay{})
+			err = m.Streams[i].Player.Send(ctx, xplayer.CommandPlayback{
+				Playing: true,
+			})
 			if err != nil {
 				return err
 			}

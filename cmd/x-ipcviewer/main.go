@@ -12,6 +12,7 @@ import (
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/build"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/bus"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/xplayer"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
 	"github.com/ItsNotGoodName/x-ipcviewer/pkg/sutureext"
 	"github.com/danielgtaylor/huma/v2/humacli"
@@ -57,7 +58,8 @@ func main() {
 			}
 
 			sutureext.Add(root, xwm.NewProgram(app.Model{
-				Store: store,
+				Volume: xplayer.NewVolume(),
+				Store:  store,
 			}))
 
 			return root.Serve(ctx)
