@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/config"
+	"github.com/ItsNotGoodName/x-ipcviewer/internal/xplayer"
 	"github.com/ItsNotGoodName/x-ipcviewer/internal/xwm"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
@@ -30,7 +31,7 @@ type ModelStream struct {
 	WID    xproto.Window
 	Main   string
 	Sub    string
-	Player Player
+	Player xplayer.Player
 }
 
 type ModelView struct {
@@ -187,14 +188,14 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 	// File
 	for _, s := range m.Streams {
 		if s.UUID == m.StreamFullscreen {
-			err := s.Player.Send(ctx, PlayerCommandLoad{
+			err := s.Player.Send(ctx, xplayer.CommandLoad{
 				File: s.Main,
 			})
 			if err != nil {
 				return err
 			}
 		} else {
-			err := s.Player.Send(ctx, PlayerCommandLoad{
+			err := s.Player.Send(ctx, xplayer.CommandLoad{
 				File: s.Sub,
 			})
 			if err != nil {
@@ -206,14 +207,14 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 	// Volume
 	for _, s := range m.Streams {
 		if s.UUID == m.StreamSelected {
-			err := s.Player.Send(ctx, PlayerCommandVolume{
+			err := s.Player.Send(ctx, xplayer.CommandVolume{
 				Volume: 100,
 			})
 			if err != nil {
 				return err
 			}
 		} else {
-			err := s.Player.Send(ctx, PlayerCommandVolume{
+			err := s.Player.Send(ctx, xplayer.CommandVolume{
 				Volume: 0,
 			})
 			if err != nil {
@@ -242,9 +243,7 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 				}
 
 				// Play
-				err = s.Player.Send(ctx, PlayerCommandState{
-					State: PlayerStatePlaying,
-				})
+				err = s.Player.Send(ctx, xplayer.CommandPlay{})
 				if err != nil {
 					return err
 				}
@@ -273,9 +272,7 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 			}
 
 			// Play
-			err = m.Streams[i].Player.Send(ctx, PlayerCommandState{
-				State: PlayerStatePlaying,
-			})
+			err = m.Streams[i].Player.Send(ctx, xplayer.CommandPlay{})
 			if err != nil {
 				return err
 			}
@@ -296,7 +293,7 @@ func (m Model) syncStreams(ctx context.Context, conn *xgb.Conn, cfgStreams []con
 				return m, xwm.Error(err)
 			}
 
-			player, err := NewPlayer(ctx, wid, m.StreamGPU)
+			player, err := xplayer.NewPlayer(ctx, cfgStream.UUID, wid, m.StreamGPU)
 			if err != nil {
 				return m, xwm.Error(err)
 			}
