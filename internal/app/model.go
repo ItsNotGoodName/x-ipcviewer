@@ -98,8 +98,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 
 			return m, nil
 		case xproto.ButtonIndex3: // Right click
-			m.StreamFullscreen = ""
-			return m, nil
+			return m.toggleFullscreen()
 		default:
 			return m, nil
 		}
@@ -111,6 +110,8 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 			slog.Debug("exit: quit key pressed")
 
 			return m.Close(ctx, conn), xwm.Quit
+		case 9: // <esc>
+			return m.toggleFullscreen()
 		case 113: // <left>
 			if len(m.Streams) == 0 {
 				return m, nil
@@ -296,6 +297,11 @@ func (m Model) Render(ctx context.Context, conn *xgb.Conn) error {
 	}
 
 	return nil
+}
+
+func (m Model) toggleFullscreen() (xwm.Model, xwm.Cmd) {
+	m.StreamFullscreen = ""
+	return m, nil
 }
 
 func (m Model) syncStreams(ctx context.Context, conn *xgb.Conn, cfgStreams []config.Stream) (xwm.Model, xwm.Cmd) {
