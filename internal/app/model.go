@@ -78,7 +78,7 @@ func (m Model) Update(ctx context.Context, conn *xgb.Conn, msg xwm.Msg) (xwm.Mod
 		switch ev.Detail {
 		case xproto.ButtonIndex1: // Left click
 			var doubleClick bool
-			m.LastLeftClick, doubleClick = checkLeftClick(m.LastLeftClick)
+			m.LastLeftClick, doubleClick = checkClick(m.LastLeftClick)
 
 			idx := slices.IndexFunc(m.Streams, func(p ModelStream) bool { return ev.Child == p.WID })
 			if idx == -1 {
@@ -340,9 +340,9 @@ func closeModelStream(ctx context.Context, conn *xgb.Conn, stream ModelStream) {
 	xwm.DestroySubWindow(conn, stream.WID)
 }
 
-func checkLeftClick(lastLeftClick time.Time) (time.Time, bool) {
-	now := time.Now()
-	if now.Sub(lastLeftClick) < 500*time.Millisecond {
+func checkClick(lastClick time.Time) (now time.Time, doubleClick bool) {
+	now = time.Now()
+	if now.Sub(lastClick) < 500*time.Millisecond {
 		return time.Time{}, true
 	} else {
 		return now, false

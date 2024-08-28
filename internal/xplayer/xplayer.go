@@ -43,7 +43,6 @@ func NewPlayer(ctx context.Context, id string, wid xproto.Window, hwdec string) 
 	_ = m.SetOption("idle", mpv.FormatFlag, true)          // keep window open when no file-loaded
 	_ = m.SetOptionString("profile", "low-latency")        // low latency for RTSP streams
 	_ = m.SetOptionString("cache", "no")                   // get latest video for RTSP streams
-	// _ = m.SetOptionString("loop-file", "inf")              // loop video
 
 	// Custom options
 	if hwdec != "" {

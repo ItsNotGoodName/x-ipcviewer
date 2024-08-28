@@ -90,9 +90,7 @@ func CreateCursor(x *xgb.Conn, cursor uint16) (xproto.Cursor, error) {
 	return CreateCursorExtra(x, cursor, 0xffff, 0xffff, 0xffff, 0, 0, 0)
 }
 
-func CreateCursorExtra(x *xgb.Conn, cursor, foreRed, foreGreen,
-	foreBlue, backRed, backGreen, backBlue uint16) (xproto.Cursor, error) {
-
+func CreateCursorExtra(x *xgb.Conn, cursor, foreRed, foreGreen, foreBlue, backRed, backGreen, backBlue uint16) (xproto.Cursor, error) {
 	fontId, err := xproto.NewFontId(x)
 	if err != nil {
 		return 0, err
@@ -103,8 +101,7 @@ func CreateCursorExtra(x *xgb.Conn, cursor, foreRed, foreGreen,
 		return 0, err
 	}
 
-	err = xproto.OpenFontChecked(x, fontId,
-		uint16(len("cursor")), "cursor").Check()
+	err = xproto.OpenFontChecked(x, fontId, uint16(len("cursor")), "cursor").Check()
 	if err != nil {
 		return 0, err
 	}
